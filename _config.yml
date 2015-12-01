@@ -71,3 +71,7 @@ deploy:
   type: git
   repo: https://github.com/cwza/cwza.github.io.git
   branch: master
+
+# Sitemap
+sitemap:
+    path: sitemap.xml
