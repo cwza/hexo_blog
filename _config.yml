@@ -7,7 +7,7 @@ title: cwza's blog
 subtitle:
 description:
 author: Cwza
-language: zh-hant
+language: en
 timezone: Asia/Taipei
 
 # URL
@@ -63,7 +63,7 @@ pagination_dir: page
 # Extensions
 ## Plugins: http://hexo.io/plugins/
 ## Themes: http://hexo.io/themes/
-theme: landscape
+theme: tranquilpeak
 
 # Deployment
 ## Docs: http://hexo.io/docs/deployment.html
@@ -75,3 +75,9 @@ deploy:
 # Sitemap
 sitemap:
     path: sitemap.xml
+
+#Rss feed
+feed:
+    type: atom
+    path: atom.xml
+    limit: 20
