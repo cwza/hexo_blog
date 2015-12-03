@@ -31,3 +31,6 @@ DC(Domain Componet)：網域元件
  
 ## clear Ldap DB
  * just remove all files at /var/openldap-data
+
+## Ldap匯入ldif指令
+bin/ldapadd.exe -v -x -D "cn=root,nodeName=2L3PCRF1" -f ..\etc\ldif\test_subscriber.ldif -W
