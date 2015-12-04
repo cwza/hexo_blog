@@ -2,7 +2,7 @@ title: developer在Mac上需要安裝的工具筆記
 categories:
   - computer science
   - mac
-tags: [mac, python, ios, nodejs, java]
+tags: [mac, python, ios, nodejs, java, editor]
 date: 2015-12-03 18:16:57
 ---
 筆記以下目前mac有裝的app

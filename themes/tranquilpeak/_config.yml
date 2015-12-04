@@ -70,10 +70,10 @@ sidebar:
         #     title: global.twitter
         #     url: https://twitter.com/
         #     icon: twitter
-        # facebook:
-        #     title: global.facebook
-        #     url: https://facebook.com/
-        #     icon: facebook
+        facebook:
+            title: global.facebook
+            url: https://facebook.com/profile.php?id=100001791342932
+            icon: facebook
         # google_plus:
         #     title: global.google_plus
         #     url: https://plus.google.com/
@@ -82,10 +82,10 @@ sidebar:
         #     title: global.linkedin
         #     url: https://www.linkedin.com/profile/
         #     icon: linkedin
-        # mail:
-        #     title: global.mail
-        #     url: mailto:
-        #     icon: envelope-o
+        mail:
+            title: global.mail
+            url: mailto:cwz0205a@gmail.com
+            icon: envelope-o
     rss:
         rss:
             title: global.rss
@@ -118,7 +118,7 @@ author:
     # or in `source/assets/images/` (production)
     # or you can use an external url
     # Overwritten by your gravatar image if `gravatar_email` is filled
-    picture: msn.jpg
+    picture:
     # Your Twitter username without the @. E.g : `tranquilpeak`
     twitter:
     # Your google plus profile id. E.g : `+Tranquilpeak` or `123812884128439`
@@ -170,7 +170,7 @@ disqus_shortname: cwzablog
 # Your Google analystics web property ID : UA-XXXXX-X
 google_analytics_id: UA-70916999-1
 # Your Gravatar email. Overwrite `author.picture` everywhere in the blog
-gravatar_email:
+gravatar_email: cwz0205a@gmail.com
 # Your swiftype install key
 swiftype_install_key: rxPzK7_9dZFEqRaWyGy2
 # Your Facebook user ids used to connect your blog with your facebook user accounts (Facebook Insights). Separate ids with comma. e.g : 9830047,1003342
