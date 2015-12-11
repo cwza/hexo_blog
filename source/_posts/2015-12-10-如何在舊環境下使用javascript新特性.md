@@ -9,7 +9,7 @@ javascript是近年來進步非常快的語言
 Browser常常趕不上ECMA標準
 導致ES6有非常多好用的新功能目前主流Browser都還沒完全支援
 即使如此還是建議大家儘量使用ES6的新東西來寫
-用以下提到的Polyfilling、Polyfilling來做
+用以下提到的Polyfilling、Transpiling來做
 
 [主流Browser對ES6支援狀況](https://kangax.github.io/compat-table/es6/)
 
