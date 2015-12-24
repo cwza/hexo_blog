@@ -16,6 +16,7 @@
     "hexo-generator-tag": "^0.1.1",
     "hexo-renderer-ejs": "^0.1.1",
     "hexo-renderer-marked": "^0.2.7",
+    "hexo-renderer-org": "git+https://github.com/CodeFalling/hexo-renderer-org.git#emacs",
     "hexo-renderer-stylus": "^0.3.0",
     "hexo-server": "^0.1.3"
   }

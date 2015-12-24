@@ -81,3 +81,13 @@ feed:
     type: atom
     path: atom.xml
     limit: 20
+
+
+# Org render
+org:
+  emacs: '/Applications/Emacs.app/Contents/MacOS/Emacs'
+  common: '#+OPTIONS: toc:nil'
+  cachedir: './hexo-org-cache/'
+highlight:
+  enable: true
+  number: true
