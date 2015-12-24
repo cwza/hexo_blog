@@ -1,6 +1,5 @@
 title: git submodule指令筆記
 categories:
-  - computer science
   - git
 tags: [git]
 date: 2015-12-03 18:49:41

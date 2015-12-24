@@ -1,6 +1,5 @@
 title: javascript學習筆記
 categories:
-  - computer science
   - javascript
 tags: [javascript]
 date: 2015-12-11 14:30:50

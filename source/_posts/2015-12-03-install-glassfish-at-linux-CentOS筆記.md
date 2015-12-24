@@ -1,5 +1,5 @@
 title: install glassfish at linux CentOS筆記
-categories: [computer science, java]
+categories: java
 tags: [glassfish, linux, java]
 date: 2015-12-03 16:14:53
 ---

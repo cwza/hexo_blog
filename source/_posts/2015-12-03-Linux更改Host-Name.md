@@ -1,5 +1,5 @@
 title: Linux更改Host Name
-categories: [computer science, linux]
+categories: linux
 tags: [linux]
 date: 2015-12-03 17:22:18
 ---

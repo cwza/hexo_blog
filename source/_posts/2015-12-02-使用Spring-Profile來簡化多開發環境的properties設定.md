@@ -1,5 +1,5 @@
 title: 使用Spring Profile來簡化多開發環境的properties設定
-categories: [computer science, java]
+categories: java
 tags: [java, spring]
 date: 2015-12-02 19:55:37
 ---

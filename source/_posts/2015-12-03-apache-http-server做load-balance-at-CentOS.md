@@ -1,6 +1,5 @@
 title: apache http server做load balance at CentOS
 categories:
-  - computer science
   - apache
 tags: [linux, apache, glassfish]
 date: 2015-12-03 17:27:59

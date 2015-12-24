@@ -1,6 +1,5 @@
 title: Tree with DB and JAVA
 categories:
-  - computer science
   - java
 tags: [java, database]
 date: 2015-12-03 17:58:46

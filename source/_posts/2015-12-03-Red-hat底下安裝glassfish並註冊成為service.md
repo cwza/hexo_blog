@@ -1,5 +1,5 @@
 title: Red hat底下安裝glassfish並註冊成為service
-categories: [computer science, java]
+categories: java
 tags: [java, linux, glassfish]
 date: 2015-12-03 16:39:56
 ---

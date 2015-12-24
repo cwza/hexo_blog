@@ -1,5 +1,5 @@
 title: '淡江大學kali-linux mirror & iso position'
-categories: [computer science, linux]
+categories: linux
 tags: [linux, kali]
 date: 2015-12-03 16:24:47
 ---

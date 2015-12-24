@@ -1,6 +1,5 @@
 title: git config筆記
 categories:
-  - computer science
   - git
 tags: [git]
 date: 2015-12-03 19:19:39

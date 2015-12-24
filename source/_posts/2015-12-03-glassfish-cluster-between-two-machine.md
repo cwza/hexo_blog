@@ -1,6 +1,5 @@
 title: glassfish cluster between two machine
 categories:
-  - computer science
   - java
 tags: [java, glassfish, linux]
 date: 2015-12-03 17:42:19

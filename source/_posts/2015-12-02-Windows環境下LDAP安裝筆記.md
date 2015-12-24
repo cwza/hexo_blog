@@ -1,5 +1,5 @@
 title: Windows環境下LDAP安裝筆記
-categories: [computer science]
+categories: computer-science
 tags: [ldap]
 date: 2015-12-02 19:41:44
 ---

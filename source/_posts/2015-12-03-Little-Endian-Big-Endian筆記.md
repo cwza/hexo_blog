@@ -1,5 +1,5 @@
 title: 'Little Endian & Big Endian筆記'
-categories: [computer science]
+categories: computer-science
 tags: [computer-science]
 date: 2015-12-03 15:56:53
 ---

@@ -1,5 +1,5 @@
 title: Edit hosts to Add Dns Mapping to Windows
-categories: [computer science, windows]
+categories: windows
 tags: [windows, ip]
 date: 2015-12-03 17:01:15
 ---

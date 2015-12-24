@@ -1,5 +1,5 @@
 title: 用JAVA來做Remote Dynamic DNS Update
-categories: [computer science, java]
+categories: java
 tags: [java, bind9]
 date: 2015-12-02 19:36:58
 ---

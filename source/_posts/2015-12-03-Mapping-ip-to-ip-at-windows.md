@@ -1,5 +1,5 @@
 title: Mapping ip to ip at windows
-categories: [computer science, windows]
+categories: windows
 tags: [windows, ip]
 date: 2015-12-03 16:59:06
 ---

@@ -1,5 +1,5 @@
 title: Linux tool nsupdate筆記
-categories: [computer science, linux]
+categories: linux
 tags: [linux]
 date: 2015-12-03 15:59:29
 ---

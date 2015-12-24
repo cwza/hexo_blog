@@ -1,5 +1,5 @@
 title: Linux start stop service筆記
-categories: [computer science, linux]
+categories: linux
 tags: [linux]
 date: 2015-12-03 16:33:24
 ---

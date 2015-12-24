@@ -1,6 +1,5 @@
 title: Excel Formula筆記
 categories:
-  - computer science
   - windows
 tags: [excel]
 date: 2015-12-03 17:51:34

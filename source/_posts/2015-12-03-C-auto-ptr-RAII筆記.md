@@ -1,5 +1,5 @@
 title: 'C++ auto_ptr & RAII筆記'
-categories: [computer science, c-plus-plus]
+categories: c-plus-plus
 tags: [c++]
 date: 2015-12-03 15:24:15
 ---

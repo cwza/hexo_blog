@@ -1,5 +1,5 @@
 title: Java Reflection筆記
-categories: [computer science, java]
+categories: java
 tags: [java]
 date: 2015-12-03 15:34:08
 ---

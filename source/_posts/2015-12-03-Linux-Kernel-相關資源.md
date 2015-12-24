@@ -1,6 +1,5 @@
 title: Linux Kernel 相關資源
 categories:
-  - computer science
   - linux
 tags: [linux]
 date: 2015-12-03 18:01:33

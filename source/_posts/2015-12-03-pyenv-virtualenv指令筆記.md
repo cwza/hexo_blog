@@ -1,6 +1,5 @@
 title: pyenv-virtualenv指令筆記
 categories:
-  - computer science
   - python
 tags: [python]
 date: 2015-12-03 18:35:46

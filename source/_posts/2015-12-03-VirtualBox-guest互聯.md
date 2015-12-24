@@ -1,6 +1,6 @@
 title: VirtualBox guest互聯
 categories:
-  - computer science
+  - computer-science
 tags: [virtualbox]
 date: 2015-12-03 17:39:56
 ---

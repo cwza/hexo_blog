@@ -1,6 +1,5 @@
 title: PyCharm import django project
 categories:
-  - computer science
   - python
 tags: [python, editor]
 date: 2015-12-03 19:15:15

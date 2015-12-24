@@ -1,6 +1,6 @@
 title: Bind9的Dynamic Dns Update設定筆記
 date: 2015-12-02 19:27:30
-categories: [computer science, linux]
+categories: linux
 tags: [linux, bind9]
 ---
 ## Something

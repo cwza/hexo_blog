@@ -1,6 +1,5 @@
 title: My vim settings at Github
 categories:
-  - computer science
   - editor
 tags: [vim, editor]
 date: 2015-12-03 18:46:42

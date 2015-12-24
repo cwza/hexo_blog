@@ -1,5 +1,5 @@
 title: 使用snmptrap或java Snmp4j send snmp trap筆記
-categories: [computer science, java]
+categories: java
 tags: [java, linux, snmp]
 date: 2015-12-03 15:46:03
 ---

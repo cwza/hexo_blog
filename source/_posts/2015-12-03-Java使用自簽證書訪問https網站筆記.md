@@ -1,5 +1,5 @@
 title: Java使用自簽證書訪問https網站筆記
-categories: [computer science, java]
+categories: java
 tags: [java, https, ssl]
 date: 2015-12-03 16:36:44
 ---

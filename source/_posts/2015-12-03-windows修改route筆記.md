@@ -1,6 +1,5 @@
 title: windows修改route筆記
 categories:
-  - computer science
   - windows
 tags: [windows]
 date: 2015-12-03 17:54:48

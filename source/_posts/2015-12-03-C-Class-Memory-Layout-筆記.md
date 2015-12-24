@@ -1,5 +1,5 @@
 title: C++ Class Memory Layout 筆記
-categories: [computer science, c-plus-plus]
+categories: c-plus-plus
 tags: [c++]
 date: 2015-12-03 16:02:22
 ---

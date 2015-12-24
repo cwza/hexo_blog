@@ -1,6 +1,5 @@
 title: 如何在舊環境下使用javascript新特性
 categories:
-  - computer science
   - javascript
 tags: [javascript, nodejs]
 date: 2015-12-10 15:27:09
