@@ -1,0 +1,20 @@
+#+TITLE: Orgmode template
+#+DATE: <2015-12-24 Thu 17:00>   
+#+TAGS: emacs, orgmode, hexo
+#+LAYOUT: post
+#+CATEGORIES: orgmode
+#+OPTIONS: toc:t
+
+
+這是orgmode 範例文章
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Orgmode
+** Why org
+#+BEGIN_SRC js
+console.log('hello');
+console.log('hello 2');
+#+END_SRC
+我编不下去了。。
