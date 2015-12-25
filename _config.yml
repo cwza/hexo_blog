@@ -86,7 +86,6 @@ feed:
 # Org render
 org:
   emacs: '/Applications/Emacs.app/Contents/MacOS/Emacs'
-  common: '#+OPTIONS: toc:nil'
   cachedir: './hexo-org-cache/'
 highlight:
   enable: true

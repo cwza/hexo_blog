@@ -1,0 +1,24 @@
+#+TITLE: org-mode筆記
+#+DATE: <2015-12-25 Fri 18:00>   
+#+TAGS: orgmode
+#+LAYOUT: post
+#+CATEGORIES: orgmode
+#+OPTIONS: toc:nil \n:t
+
+隨筆亂記
+
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Syntax highlight
+詳細支援的語言列表可以查這裡http://orgmode.org/manual/Languages.html
+
+#+BEGIN_HTML
+<pre>
+#+BEGIN_SRC js
+console.log('hello world');
+#+END_SRC
+</pre>
+#+END_HTML

@@ -3,10 +3,10 @@
 #+TAGS: emacs, orgmode, hexo
 #+LAYOUT: post
 #+CATEGORIES: orgmode
-#+OPTIONS: toc:t
+#+OPTIONS: toc:t \n:t
 
 
-這是orgmode 範例文章
+這是orgmode template，完全自用請勿參考
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
