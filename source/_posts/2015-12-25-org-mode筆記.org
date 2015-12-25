@@ -22,3 +22,6 @@ console.log('hello world');
 #+END_SRC
 </pre>
 #+END_HTML
+#+BEGIN_SRC js
+console.log('hello world');
+#+END_SRC
