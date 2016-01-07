@@ -235,8 +235,6 @@ obj1.obj2.foo(); // 42
 #+END_SRC
 在callback下，容易發生implicitly lost
 #+BEGIN_SRC javascript
-在callback下，容易發生implicitly lost
-``` js Implicitly Lost
 function foo() {
     console.log( this.a );
 }
@@ -370,5 +368,290 @@ var obj = {
 foo.call( obj ); // 2
 #+END_SRC
 當然你也能用bind來處理callback的this，這三種方法就是程式風格的不同而已，儘量統一就好
+* Object
+** Computed Property Names
+ES6 adds computed property names, where you can specify an expression, surrounded by a [ ] pair, in the key-name position of an object-literal declaration:
+#+BEGIN_SRC javascript 
+var prefix = "foo";
+
+var myObject = {
+    [prefix + "bar"]: "hello",
+    [prefix + "baz"]: "world"
+};
+
+myObject["foobar"]; // hello
+myObject["foobaz"]; // world
+#+END_SRC
+常配合ES6新增的Symbol使用
+#+BEGIN_SRC javascript
+var myObject = {
+    [Symbol.Something]: "hello world"
+};
+#+END_SRC
+** Duplicating Objects
+Copy Object分成shallow copy and deep copy，其中deep copy可能會出現某些問題
+例如以下例子，deep copy將造成infinite circular duplication
+#+BEGIN_SRC javascript
+function anotherFunction() { /*..*/ }
+
+var anotherObject = {
+    c: true
+};
+
+var anotherArray = [];
+
+var myObject = {
+    a: 2,
+    b: anotherObject,   // reference, not a copy!
+    c: anotherArray,    // another reference!
+    d: anotherFunction
+};
+
+anotherArray.push( anotherObject, myObject );
+#+END_SRC
+若欲複製的object是JSON-safe (that is, can be serialized to a JSON string and then re-parsed to an object with the same structure and values)，我們可以用以下方式做到deep copy
+#+BEGIN_SRC javascript
+var newObj = JSON.parse( JSON.stringify( someObj ) );
+#+END_SRC
+shallow copy比較沒有爭議，所以ES6提供以下方式：
+#+BEGIN_SRC javascript
+var newObj = Object.assign( {}, myObject );
+
+newObj.a;                       // 2
+newObj.b === anotherObject;     // true
+newObj.c === anotherArray;      // true
+newObj.d === anotherFunction;   // true
+#+END_SRC
+** Property Descriptors
+ES5以後才有的功能
++ writable(可否modify)
++ enumerable(可否用for...in遍歷)
++ configurable(可否用difineProperty重新定義 and 可否用delete刪除)
+
+Get Property Descriptors
+#+BEGIN_SRC javascript
+var myObject = {
+    a: 2
+};
+
+Object.getOwnPropertyDescriptor( myObject, "a" );
+// {
+//    value: 2,
+//    writable: true,
+//    enumerable: true,
+//    configurable: true
+// }
+#+END_SRC
+
+Modify Property Descriptors
+#+BEGIN_SRC javascript
+var myObject = {};
+
+Object.defineProperty( myObject, "a", {
+    value: 2,
+    writable: false, // not writable!
+    configurable: true,
+    enumerable: true
+} );
+
+myObject.a = 3;
+
+myObject.a; // 2
+#+END_SRC
+若是在strict mode，上述會扔出TypeError
+
+** Immutability
+以下方式均只能做到shallow immutability. That is, they affect only the object and its direct property characteristics. If an object has a reference to another object (array, object, function, etc), the contents of that object are not affected, and remain mutable.
+*** Object Constant
+Use writable:false and configurable:false to construct Constant Property
+#+BEGIN_SRC javascript
+var myObject = {};
+
+Object.defineProperty( myObject, "FAVORITE_NUMBER", {
+    value: 42,
+    writable: false,
+    configurable: false
+} );
+#+END_SRC
+*** Prevent Extensions
+#+BEGIN_SRC javascript
+var myObject = {
+    a: 2
+};
+
+Object.preventExtensions( myObject );
+
+myObject.b = 3;
+myObject.b; // undefined
+#+END_SRC
+*** Seal
+Object.seal(..) creates a "sealed" object, which means it takes an existing object and essentially calls Object.preventExtensions(..) on it, but also marks all its existing properties as configurable:false.
+*** Freeze
+Object.freeze(..) creates a frozen object, which means it takes an existing object and essentially calls Object.seal(..) on it, but it also marks all "data accessor" properties as writable:false, so that their values cannot be changed.
+
+若需要deep freeze，可自行recursive Object.freeze()
+** Getters & Setters
+You will almost certainly want to always declare both getter and setter (having only one or the other often leads to unexpected/surprising behavior)
+#+BEGIN_SRC javascript
+var myObject = {
+    // define a getter for `a`
+    get a() {
+        return this._a_;
+    },
+
+    // define a setter for `a`
+    set a(val) {
+        this._a_ = val * 2;
+    }
+};
+
+myObject.a = 2;
+
+myObject.a; // 4
+#+END_SRC
+** Existence
+如何check object是否有某個property
+#+BEGIN_SRC javascript
+var myObject = {
+    a: 2
+};
+
+("a" in myObject);              // true
+("b" in myObject);              // false
+
+myObject.hasOwnProperty( "a" ); // true
+myObject.hasOwnProperty( "b" ); // false
+#+END_SRC
+in與hasOwnProperty的最大不同處在in會檢查prototype chain而hasOwnProperty不會，需小心的是若object沒有 delegation to Object.prototype，他將不會擁有hasOwnProperty，此時可以使用Object.prototype.hasOwnProperty.call(myObject,"a")來檢查
+另外in看起來好像可以這樣用：4 in [2, 4, 6]，但實際上它檢查的是object的property，所以此用法是錯誤的，in不可用來檢查containers是否存在某值
+** Enumeration
+#+BEGIN_SRC javascript
+var myObject = { };
+
+Object.defineProperty(
+    myObject,
+    "a",
+    // make `a` enumerable, as normal
+    { enumerable: true, value: 2 }
+);
+
+Object.defineProperty(
+    myObject,
+    "b",
+    // make `b` NON-enumerable
+    { enumerable: false, value: 3 }
+);
+
+myObject.b; // 3
+("b" in myObject); // true
+myObject.hasOwnProperty( "b" ); // true
+
+// .......
+
+for (var k in myObject) {
+    console.log( k, myObject[k] );
+}
+// "a" 2
+#+END_SRC
+*Note:* for...in將會travel all values and properties(include prototype chain)，所以建議遍歷object使用for...in loop，遍歷array的話使用一般for loop
+#+BEGIN_SRC javascript
+var myObject = { };
+
+Object.defineProperty(
+    myObject,
+    "a",
+    // make `a` enumerable, as normal
+    { enumerable: true, value: 2 }
+);
+
+Object.defineProperty(
+    myObject,
+    "b",
+    // make `b` non-enumerable
+    { enumerable: false, value: 3 }
+);
+
+myObject.propertyIsEnumerable( "a" ); // true
+myObject.propertyIsEnumerable( "b" ); // false
+
+Object.keys( myObject ); // ["a"]
+Object.getOwnPropertyNames( myObject ); // ["a", "b"]
+#+END_SRC
+目前沒有built-in方法可做到list all keys in object include prototype chain，需要自行recursive Object.keys()
+** Iteration
+for...in loop拿出來的東西會是object的properties，但若我們想直接拿出value呢？
+ES6新增的for...of loop可辦到
+#+BEGIN_SRC javascript
+var myArray = [ 1, 2, 3 ];
+
+for (var v of myArray) {
+    console.log( v );
+}
+// 1
+// 2
+// 3
+#+END_SRC
+for...of僅能用在有定義@@iterator的object上，array預設就有，但其他object預設是沒有的
+若想用for...of的話還是可以自己定義@@iterator，滿足以下即可：
+As long as your iterator returns the expected { value: .. } return values from next() calls, and a { done: true } after the iteration is complete, ES6's for..of can iterate over it.
+#+BEGIN_SRC javascript
+
+var myObject = {
+    a: 2,
+    b: 3
+};
+
+Object.defineProperty( myObject, Symbol.iterator, {
+    enumerable: false,
+    writable: false,
+    configurable: true,
+    value: function() {
+        var o = this;
+        var idx = 0;
+        var ks = Object.keys( o );
+        return {
+            next: function() {
+                return {
+                    value: o[ks[idx++]],
+                    done: (idx > ks.length)
+                };
+            }
+        };
+    }
+} );
+
+// iterate `myObject` manually
+var it = myObject[Symbol.iterator]();
+it.next(); // { value:2, done:false }
+it.next(); // { value:3, done:false }
+it.next(); // { value:undefined, done:true }
+
+// iterate `myObject` with `for..of`
+for (var v of myObject) {
+    console.log( v );
+}
+// 2
+// 3
+#+END_SRC
+以下是一個利用iterator的亂數產生器
+#+BEGIN_SRC javascript
+var randoms = {
+    [Symbol.iterator]: function() {
+        return {
+            next: function() {
+                return { value: Math.random() };
+            }
+        };
+    }
+};
+
+var randoms_pool = [];
+for (var n of randoms) {
+    randoms_pool.push( n );
+
+    // don't proceed unbounded!
+    if (randoms_pool.length === 100) break;
+}
+#+END_SRC
 * ES6新東東
-let, const, arrow function, class, module
+let, const, arrow function, class, module, symbol
