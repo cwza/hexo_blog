@@ -15,7 +15,7 @@
 
 =The function of javascript is just an Object so it can has properties or functions in it.=
 
-* javascript built-in types
+* Javascript built-in types
 + =string=
 + =number=
 + =boolean=
@@ -652,6 +652,245 @@ for (var n of randoms) {
     // don't proceed unbounded!
     if (randoms_pool.length === 100) break;
 }
+#+END_SRC
+* Mixing (Up) "Class" Objects
+JavaScript's object mechanism does not automatically perform copy behavior when you "inherit" or "instantiate". Plainly, there's no "classes" in JavaScript to instantiate, only objects. And objects don't get copied to other objects, they get linked together.
+
+Since observed class behaviors in other languages imply copies, let's examine how JS developers *fake* the missing copy behavior of classes in JavaScript: mixins. We'll look at two types of "mixin": explicit and implicit.
+** Explicit Mixins
+Such a utility is often called =extend(..)= by many libraries/frameworks, but we will call it =mixin(..)= here for illustrative purposes.
+#+BEGIN_SRC javascript
+// vastly simplified `mixin(..)` example:
+function mixin( sourceObj, targetObj ) {
+    for (var key in sourceObj) {
+        // only copy if not already present
+        if (!(key in targetObj)) {
+            targetObj[key] = sourceObj[key];
+        }
+    }
+
+    return targetObj;
+}
+
+var Vehicle = {
+    engines: 1,
+
+    ignition: function() {
+        console.log( "Turning on my engine." );
+    },
+
+    drive: function() {
+        this.ignition();
+        console.log( "Steering and moving forward!" );
+    }
+};
+
+var Car = mixin( Vehicle, {
+    wheels: 4,
+
+    drive: function() {
+        Vehicle.drive.call( this );
+        console.log( "Rolling on all " + this.wheels + " wheels!" );
+    }
+} );
+#+END_SRC
+But because of JavaScript's peculiarities, explicit pseudo-polymorphism (because of shadowing!) creates brittle manual/explicit linkage *in every single function where you need such a (pseudo-)polymorphic reference*. This can significantly increase the maintenance cost. Moreover, while explicit pseudo-polymorphism can emulate the behavior of "multiple inheritance", it only increases the complexity and brittleness.
+
+The result of such approaches is usually more complex, harder-to-read, and harder-to-maintain code. *Explicit pseudo-polymorphism should be avoided wherever possible*, because the cost outweighs the benefit in most respects.
+** Implicit Mixins
+#+BEGIN_SRC javascript
+
+var Something = {
+    cool: function() {
+        this.greeting = "Hello World";
+        this.count = this.count ? this.count + 1 : 1;
+    }
+};
+
+Something.cool();
+Something.greeting; // "Hello World"
+Something.count; // 1
+
+var Another = {
+    cool: function() {
+        // implicit mixin of `Something` to `Another`
+        Something.cool.call( this );
+    }
+};
+
+Another.cool();
+Another.greeting; // "Hello World"
+Another.count; // 1 (not shared state with `Something`)
+#+END_SRC
+While this sort of technique seems to take useful advantage of this rebinding functionality, it is the brittle Something.cool.call( this ) call, which cannot be made into a relative (and thus more flexible) reference, that you should heed with caution. Generally, avoid such constructs where possible to keep cleaner and more maintainable code.
+** Conclusion 
+Classes are a design pattern. Many languages provide syntax which enables natural class-oriented software design. JS also has a similar syntax, but it behaves very differently from what you're used to with classes in those other languages.
+
+*Classes mean copies.*
+
+When traditional classes are instantiated, a copy of behavior from class to instance occurs. When classes are inherited, a copy of behavior from parent to child also occurs.
+
+Polymorphism (having different functions at multiple levels of an inheritance chain with the same name) may seem like it implies a referential relative link from child back to parent, but it's still just a result of copy behavior.
+
+JavaScript *does not automatically create copies* (as classes imply) between objects.
+
+The mixin pattern (both explicit and implicit) is often used to sort of emulate class copy behavior, but this usually leads to ugly and brittle syntax like explicit pseudo-polymorphism (=OtherObj.methodName.call(this, ...)=), which often results in harder to understand and maintain code.
+
+Explicit mixins are also not exactly the same as class copy, since objects (and functions!) only have shared references duplicated, not the objects/functions duplicated themselves. Not paying attention to such nuance is the source of a variety of gotchas.
+
+In general, faking classes in JS often sets more landmines for future coding than solving present real problems.
+* Prototype
+JavaScript沒有Class(一般Class-Oriented Language的class)，只有Object
+Prototype的概念比較類似Delegate而不是Inherited(Copy)
+Objects in JavaScript have an internal property, denoted in the specification as Prototype, which is simply a reference to another object. Almost all objects are given a non-null value for this property, at the time of their creation.
+#+BEGIN_SRC javascript
+var anotherObject = {
+    a: 2
+};
+
+// create an object linked to `anotherObject`
+var myObject = Object.create( anotherObject );
+
+myObject.a; // 2
+#+END_SRC
+** Setting & Shadowing Properties
+1. If a normal data accessor property named foo is found anywhere higher on the Prototype chain, and it's not marked as read-only (writable:false) then a new property called foo is added directly to myObject, resulting in a shadowed property.
+2. If a foo is found higher on the Prototype chain, but it's marked as read-only (writable:false), then both the setting of that existing property as well as the creation of the shadowed property on myObject are disallowed. If the code is running in strict mode, an error will be thrown. Otherwise, the setting of the property value will silently be ignored. Either way, no shadowing occurs.
+3. If a foo is found higher on the Prototype chain and it's a setter (see Chapter 3), then the setter will always be called. No foo will be added to (aka, shadowed on) myObject, nor will the foo setter be redefined.
+#+BEGIN_SRC javascript
+var anotherObject = {
+    a: 2
+};
+
+var myObject = Object.create( anotherObject );
+
+anotherObject.a; // 2
+myObject.a; // 2
+
+anotherObject.hasOwnProperty( "a" ); // true
+myObject.hasOwnProperty( "a" ); // false
+
+myObject.a++; // oops, implicit shadowing!
+
+anotherObject.a; // 2
+myObject.a; // 3
+
+myObject.hasOwnProperty( "a" ); // true
+#+END_SRC
+Shadowing with methods leads to ugly explicit pseudo-polymorphism if you need to delegate between them. Usually, shadowing is more complicated and nuanced than it's worth, so you should try to avoid it if possible. Use *Behavior Delegation* for an alternative design pattern, which among other things discourages shadowing in favor of cleaner alternatives.
+** New(Constructor Call)
+1. a brand new object is created (aka, constructed) out of thin air
+2. the newly constructed object is Prototype-linked
+3. the newly constructed object is set as the this binding for that function call
+4. unless the function returns its own alternate object, the new-invoked function call will automatically return the newly constructed object.
+JS沒有Class也沒有Constructor，new的概念跟一般Class-Oriented Language完全不同
+New可以放在任何function前，此時被稱為Constructor Call
+var a = new Foo()代表：
+建立新object a，a的__proto__指向Foo.prototype，this綁定到該a上
+#+BEGIN_SRC javascript
+function Foo() {
+    // ...
+}
+
+var a = new Foo();
+
+Object.getPrototypeOf( a ) === Foo.prototype; // true
+#+END_SRC
+利用prototype模擬Class instantiate Object
+看起來很像Class-Oriented，但實際上是利用上述機制
+#+BEGIN_SRC javascript
+function Foo(name) {
+    this.name = name;
+}
+
+Foo.prototype.myName = function() {
+    return this.name;
+};
+
+var a = new Foo( "a" );
+var b = new Foo( "b" );
+
+a.myName(); // "a"
+b.myName(); // "b"
+#+END_SRC
+** constructor
+#+BEGIN_SRC javascript
+function Foo() {
+    // ...
+}
+
+Foo.prototype.constructor === Foo; // true
+
+var a = new Foo();
+a.constructor === Foo; // true
+#+END_SRC
+看起來好像a擁有一個property指向Foo，實際上卻是a.__proto__.constructor
+此constructor指向Foo看似很有用實際上卻可被複寫，*因此別依賴這個特性*
+#+BEGIN_SRC javascript
+function Foo() { /* .. */ }
+
+Foo.prototype = { /* .. */ }; // create a new prototype object
+
+var a1 = new Foo();
+a1.constructor === Foo; // false!
+a1.constructor === Object; // true!
+#+END_SRC
+** (Prototypal) Inheritance
+#+BEGIN_SRC javascript
+function Foo(name) {
+    this.name = name;
+}
+
+Foo.prototype.myName = function() {
+    return this.name;
+};
+
+function Bar(name,label) {
+    Foo.call( this, name );
+    this.label = label;
+}
+
+// here, we make a new `Bar.prototype`
+// linked to `Foo.prototype`
+Bar.prototype = Object.create( Foo.prototype );
+
+// Beware! Now `Bar.prototype.constructor` is gone,
+// and might need to be manually "fixed" if you're
+// in the habit of relying on such properties!
+
+Bar.prototype.myLabel = function() {
+    return this.label;
+};
+
+var a = new Bar( "a", "obj a" );
+
+a.myName(); // "a"
+a.myLabel(); // "obj a"
+#+END_SRC
+Object.create(..) creates a "new" object out of thin air, and links that new object's internal Prototype to the object you specify (Foo.prototype in this case).
+
+底下是兩個錯誤用法
+#+BEGIN_SRC javascript
+
+// doesn't work like you want!
+// 這樣的話根本不需要多一個Bar，用Foo就好了
+Bar.prototype = Foo.prototype;
+
+// works kinda like you want, but with
+// side-effects you probably don't want :(
+// 若Foo()裡面有做一些其他事，會一起做，但是我們只是要建立prototype chain
+Bar.prototype = new Foo();
+#+END_SRC
+
+ES6後可以用Object.setPrototypeOf()代替Object.create()
+#+BEGIN_SRC javascript
+// pre-ES6
+// throws away default existing `Bar.prototype`
+Bar.prototype = Object.create( Foo.prototype );
+
+// ES6+
+// modifies existing `Bar.prototype`
+Object.setPrototypeOf( Bar.prototype, Foo.prototype );
 #+END_SRC
 * ES6新東東
 let, const, arrow function, class, module, symbol
