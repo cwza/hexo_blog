@@ -1,0 +1,38 @@
+#+TITLE: Uninstall Vmware Fusion
+#+DATE: <2016-01-13 Thu 14:51>   
+#+TAGS: vmware, mac
+#+LAYOUT: post
+#+CATEGORIES: mac
+#+OPTIONS: toc:nil \n:t
+
+This article provides steps to manually uninstall VMware Fusion
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+
+* Manually uninstalling VMware Fusion 8.x, 7.x, 6.x, 5.x and 4.x
+
+In VMware Fusion 4.x, 5.x, 6.x, 7.x and 8.x, there is no uninstaller. Most VMware Fusion files are contained within the application bundle (that is, the VMware Fusion application in /*Applications*). To uninstall VMware Fusion 4.x, 5.x, 6.x,7.x or 8.x, drag the application bundle from the Applications folder to the Trash.
+
+Also ensure that you delete these additional files and folders, if they are present:
+
+*Note*: Depending on the environment, some of these files may not be present. Some files may exist only if VMware Fusion 3 was originally installed on a machine that was later upgraded to VMware Fusion 4.x, 5.x, 6.x, 7.x or 8.x.
++ /Library/Application Support/VMware
++ /Library/Application Support/VMware Fusion
++ /Library/Preferences/VMware Fusion
++ ~/Library/Application Support/VMware Fusion
++ ~/Library/Caches/com.vmware.fusion
++ ~/Library/Preferences/VMware Fusion
++ ~/Library/Preferences/com.vmware.fusion.LSSharedFileList.plist
++ ~/Library/Preferences/com.vmware.fusion.LSSharedFileList.plist.lockfile
++ ~/Library/Preferences/com.vmware.fusion.plist
++ ~/Library/Preferences/com.vmware.fusion.plist.lockfile
++ ~/Library/Preferences/com.vmware.fusionDaemon.plist
++ ~/Library/Preferences/com.vmware.fusionDaemon.plist.lockfile
++ ~/Library/Preferences/com.vmware.fusionStartMenu.plist
++ ~/Library/Preferences/com.vmware.fusionStartMenu.plist.lockfile
+
+*Note*: In Mac OS X 10.7 Lion and later, the Library folder inside your user directory is hidden by default. To access your Library folder:
+1. Click the Finder icon.
+2. While pressing the Option key, click the Go menu. This reveals your Library folder.
