@@ -892,5 +892,22 @@ Bar.prototype = Object.create( Foo.prototype );
 // modifies existing `Bar.prototype`
 Object.setPrototypeOf( Bar.prototype, Foo.prototype );
 #+END_SRC
+* Behavior Delegation
+以下都先參考原文吧，我有空在整理
+主要是說在javascript世界中Behavior Delegation的做法比OO還要直覺簡單，有實際例子、code舉例
+[[https://github.com/getify/You-Dont-Know-JS/blob/master/this%2520&%2520object%2520prototypes/ch6.md][You-Dont-Know-JS/this & object prototypes/ch6.md]]
+* Asynchrony
+大致介紹javascript的Asynchronous
+JS Engine本身沒有multi-thread，javascript的Asynchronous是靠run environment的event loop queue達成
+[[https://github.com/getify/You-Dont-Know-JS/blob/master/async%2520&%2520performance/ch1.md][You-Dont-Know-JS/async & performance/ch1.md]]
+* Callbacks
+主要是在說明傳統使用callback來達成Asynchronous的各種缺點
+1. 反人類思考模式，難以閱讀
+2. callback會將程式帶到非自己所寫的function，可以在callback中撰寫各種check來處理但不夠好
+[[https://github.com/getify/You-Dont-Know-JS/blob/master/async%2520&%2520performance/ch2.md][You-Dont-Know-JS/async & performance/ch2.md]]
 * ES6新東東
 let, const, arrow function, class, module, symbol
+* Reference
+此筆記主要是來自截取並整理自Github上的You-Dont-Know-JS
+附上原始位置供各位參考
+https://github.com/getify/You-Dont-Know-JS
