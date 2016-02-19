@@ -1,0 +1,224 @@
+#+TITLE: django學習筆記
+#+DATE: <2016-02-19 Fri 16:15>   
+#+TAGS: python, django
+#+LAYOUT: post
+#+CATEGORIES: python
+#+OPTIONS: toc:t \n:t
+
+django學習筆記
+隨筆亂記，陸續增加中
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Layout Django Project
+直接參考github上大大寫好的layout工具吧
+https://github.com/pydanny/cookiecutter-django
+
+* Setting Files
+** 如何處理多環境設定(production, staging, local)
+將setting files分開成各個環境，所有setting file全部進入git控管
+底下為例子，在<repository root>/config/settings
+#+begin_src sh
+settings/
+      __init__.py
+      base.py
+      dev_audreyr.py
+      dev_pydanny.py
+      local.py
+      staging.py
+      test.py
+      production.py
+#+end_src
+
+local設定繼承自base
+#+begin_src python
+# settings/local.py 
+from .base import *
+DEBUG = True
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": "twoscoops",
+        "USER": "",
+        "PASSWORD": "",
+        "HOST": 
+        "localhost",
+        "PORT": "",
+        } 
+}
+
+INSTALLED_APPS += ("debug_toolbar", )
+#+end_src
+
+個人設定，繼承自local
+#+begin_src python
+# settings/dev_pydanny.py 
+from .local import *
+# Set short cache timeout
+CACHE_TIMEOUT = 30
+#+end_src
+
+執行時用以下方式指定setting file執行
+#+begin_src sh
+django-admin shell --settings=twoscoops.settings.local
+django-admin runserver --settings=twoscoops.settings.local
+#+end_src
+在server上可以設定環境變數DJANGO SETTINGS MODULE and PYTHONPATH來指定setting file，或利用virtualenv來設定(add Export to the end of virtualenv's bin/activate)
+** 重要的secret key問題(secret key不該進入version control)
+secret key不該進入version control所以不要把它放在setting file中
+最好是放在environment variable，setting file中用os.environ["SOME_SECRET_KEY"]去拿
+
+linux下將以下放到.bashrc, .bash_profile, or .profile
+或利用virtualenv來設定(add Export to the end of virtualenv's bin/activate)
+#+begin_src sh
+export SOME_SECRET_KEY=1c3-cr3am-15-yummy
+#+end_src
+
+setting file用以下方式拿secret key
+#+begin_src python
+# Top of settings/production.py
+import os
+SOME_SECRET_KEY = os.environ["SOME_SECRET_KEY"]
+#+end_src
+
+上述方式在拿不到environ variable時錯誤訊息會是key_error，不甚好，可在base.py中加入以下改良
+#+begin_src python
+# settings/base.py 
+import os
+# Normally you should not import ANYTHING from Django directly
+# into your settings, but ImproperlyConfigured is an exception.
+from django.core.exceptions import ImproperlyConfigured .
+def get_env_variable(var_name):
+    """Get the environment variable or return exception.""" 
+    try:
+        return os.environ[var_name] 
+    except KeyError:
+        error_msg = "Set the {} environment variable".format(var_name)
+        raise ImproperlyConfigured(erro.r_msg)
+#+end_src
+
+#+begin_src python
+SOME_SECRET_KEY = get_env_variable("SOME_SECRET_KEY")
+#+end_src
+** 當環境限制無法使用environment variable時怎麼做呢
+將secret_key放進json file(or xml, yml ...etc)，setting file中利用json util將secret_key讀出，注意此secret file不該進入version control
+#+begin_src javascript
+{
+    "FILENAME": "secrets.json",
+    "SECRET_KEY": "I've got a secret!",
+    "DATABASES_HOST": "127.0.0.1",
+    "PORT": "5432"
+}
+#+end_src
+
+#+begin_src python
+# settings/base.py
+import json
+# Normally you should not import ANYTHING from Django directly # into your settings, but ImproperlyConfigured is an exception. from django.core.exceptions import ImproperlyConfigured
+
+# JSON-based secrets module
+
+with open("secrets.json") as f:
+    secrets = json.loads(f.read())
+def get_secret(setting, secrets=secrets):
+    """Get the secret variable or return explicit exception."""
+    try:
+        return secrets[setting] 
+    except KeyError:
+        error_msg = "Set the {0} environment variable".format(setting) 
+        raise ImproperlyConfigured(error_msg)
+
+SECRET_KEY = get_secret("SECRET_KEY")
+#+end_src
+
+** Requirements Files也要照環境分開
+不同環境可能需要裝不同package(ex: local才需要debug工具)
+在<repository root>/requirements
+#+begin_src sh
+requirements/
+    base.txt
+    local.txt
+    staging.txt
+    production.txt
+#+end_src
+
+in base.txt
+#+begin_src python
+Django==1.8.0
+psycopg2==2.6
+djangorestframework==3.1.1
+#+end_src
+
+in local.txt
+#+begin_src python
+-r base.txt # includes the base.txt requirements file
+
+coverage==3.7.1
+django-debug-toolbar==1.3.0
+#+end_src
+
+in production.txt
+#+begin_src python
+-r base.txt # includes the base.txt requirements file
+#+end_src
+
+裝package時用以下指令指定requirements檔案安裝
+#+begin_src sh
+$ pip install -r requirements/local.txt
+$ pip install -r requirements/production.txt
+#+end_src
+** Setting Files中的Path不要使用Absolute Path
+利用Unipath (http://pypi.python.org/pypi/Unipath/)
+#+begin_src python
+# At the top of settings/base.py 
+from unipath import Path
+
+BASE_DIR = Path(__file__).ancestor(3)
+MEDIA_ROOT = BASE_DIR.child("media")
+STATIC_ROOT = BASE_DIR.child("static")
+STATICFILES_DIRS = (
+    BASE_DIR.child("assets"),
+)
+TEMPLATES = [
+    {
+         'BACKEND': 'django.template.backends.django.DjangoTemplates',
+         DIRS = (BASE_DIR.child("templates"),)
+     },
+]
+#+end_src
+
+或用python內建的os.path
+#+begin_src python
+# At the top of settings/base.py
+from os.path import join, abspath, dirname
+here = lambda *dirs: join(abspath(dirname(__file__)), *dirs) BASE_DIR = here("..", "..")
+root = lambda *dirs: join(abspath(BASE_DIR), *dirs)
+
+# Configuring MEDIA_ROOT
+MEDIA_ROOT = root("media")
+
+# Configuring STATIC_ROOT
+STATIC_ROOT = root("collected_static")
+
+# Additional locations of static files
+STATICFILES_DIRS = (
+    root("assets"),
+)
+
+# Configuring TEMPLATE_DIRS
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        DIRS = (root("templates"),)
+    }, 
+]
+#+end_src
+* Reference
+此筆記大多來自這本書：
+Two Scoops of Django: Best Practices for Django 1.8
+by Daniel Roy Greenfeld (Author), Audrey Roy Greenfeld (Author)
+https://www.twoscoopspress.com/

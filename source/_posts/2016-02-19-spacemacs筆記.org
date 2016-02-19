@@ -1,0 +1,36 @@
+#+TITLE: spacemacs筆記
+#+DATE: <2016-02-19 Fri 14:43> 
+#+TAGS: emacs, editor, spacemacs
+#+LAYOUT: post
+#+CATEGORIES: editor
+#+OPTIONS: toc:nil \n:t
+
+spacemacs筆記
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 指令筆記
+#+begin_src sh
+spc f e d #find .spacemacs 
+spc f r #find recent file
+spc f f #find file
+spc t g #toggle golden ratio
+spc y #avy goto line
+spc spc #avy goto word
+spc S #auto Spelling
+#+end_src
+** dired
+#+begin_src sh
+spc f j #goto dired
+
++ #create folder
+C-x C-f #create new file
+g #reload
+#+end_src
+** magit
+#+begin_src sh
+spc g s #git status
+
+C-c C-c #commit訊息編輯完後save
+#+end_src
