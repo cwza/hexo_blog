@@ -217,6 +217,43 @@ TEMPLATES = [
     }, 
 ]
 #+end_src
+* Model
+** Model Inheritance
+當重複field太多時，可考慮abstract base inheritance，例如幾乎每個model都要有created, modified
++ Abstract base classes: 實際上DB不會有parent table
++ multi-table inheritance: DB確實會長出parent table and child table然後用foreign key連結
++ proxy models
+
+*不要使用multi-table inheritance，由於其實是使用foreign key處理所以會有效能問題*
+
+以下為例子
+core.models.TimeStampedModel裡有常用的created and modified field
+flavors.Flovor繼承TimeStampedModel的field
+注意
+    class Meta: 
+        abstract = True
+#+begin_src python
+# core/models.py
+from django.db import models
+class TimeStampedModel(models.Model): 
+    """
+    An abstract base class model that provides self-
+    updating ``created`` and ``modified`` fields.
+    """
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta: 
+        abstract = True
+#+end_src
+#+begin_src python
+# flavors/models.py
+from django.db import models
+from core.models import TimeStampedModel
+
+class Flavor(TimeStampedModel):
+    title = models.CharField(max_length=200)
+#+end_src
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
