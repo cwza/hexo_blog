@@ -498,6 +498,57 @@ def ice_cream_store_display(request, store_id):
         'now': timezone.now()
     })
 #+end_src
+* Function-Based Views
+** Use Decorator To Modify Request And Response
+Here’s a sample decorator template for use in function-based views:
+functools.wraps() is a convenience tool that copies over metadata including critical data like docstrings to the newly decorated function.
+#+begin_src python
+# simple decorator template import functools
+def decorator(view_func): 
+    @functools.wraps(view_func)
+    def new_view_func(request, *args, **kwargs):
+        # You can modify the request (HttpRequest) object here. 
+        response = view_func(request, *args, **kwargs)
+        # You can modify the response (HttpResponse) object here. 
+        return response
+    return new_view_func
+#+end_src
+
+check_sprinkles is a decorator to modify request:
+#+begin_src python
+# sprinkles/decorators.py 
+from functools import wraps
+from . import utils
+
+# based off the decorator template from Example 8.5 
+def check_sprinkles(view_func):
+"""Check if a user can add sprinkles""" 
+    @wraps(view_func)
+    def new_view_func(request, *args, **kwargs):
+        # Act on the request object with utils.can_sprinkle()
+        request = utils.can_sprinkle(request)
+        # Call the view function
+        response = view_func(request, *args, **kwargs)
+        # Return the HttpResponse object
+        return response 
+    return new_view_func
+#+end_src
+
+Then we attach it to the function thus:
+#+begin_src python
+# views.py
+from django.shortcuts import get_object_or_404, render
+from .decorators import check_sprinkles
+from .models import Sprinkle
+
+# Attach the decorator to the view 
+@check_sprinkles
+def sprinkle_detail(request, pk):
+    """Standard detail view"""
+    sprinkle = get_object_or_404(Sprinkle, pk=pk)
+    return render(request, "sprinkles/sprinkle_detail.html",
+        {"sprinkle": sprinkle})
+#+end_src
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
