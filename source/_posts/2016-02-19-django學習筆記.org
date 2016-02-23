@@ -463,6 +463,26 @@ class TasteUpdateView(UpdateView):
         return reverse("tastings:detail", .
             kwargs={"pk": self.object.pk})
 #+end_src
+
+template example:
+{% raw %}
+#+begin_src python
+{% extends "base.html" %}
+{% block title %}Tastings{% endblock title %}
+{% block content %}
+<ul>
+  {% for taste in tastings %} 
+    <li>
+      <a href="{% url "tastings:detail" taste.pk %}">{{ taste.title }}</a>
+      <small>
+        (<a href="{% url "tastings:update" taste.pk %}">update</a>)
+      </small>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock content %}
+#+end_src
+{% endraw %}
 ** Django Views Are Functions
 Class-Based Views Are Actually Called as Functions
 #+begin_src python
@@ -548,6 +568,504 @@ def sprinkle_detail(request, pk):
     sprinkle = get_object_or_404(Sprinkle, pk=pk)
     return render(request, "sprinkles/sprinkle_detail.html",
         {"sprinkle": sprinkle})
+#+end_src
+* Class-Based Views
+** Guidelines When Working With CBVs
++ Less view code is better.
++ Never repeat code in views.
++ Views should handle presentation logic. Try to keep business logic in models when possible, or in forms if you must.
++ Keep your views simple.
++ Don’t use CBVs to write custom 403, 404, and 500 error handlers. Use FBVs instead.
++ Keep your mixins simpler.
+** Using Mixins With CBVs
+The rules follow Python’s method resolution order, which in the most simplistic de nition possible, proceeds from left to right:
+1. The base view classes provided by Django always go to the right.
+2. Mixins go to the left of the base view.
+3. Mixins should inherit from Python’s built-in object type.
+
+Example of the rules in action:
+#+begin_src python
+from django.views.generic import TemplateView 
+
+class FreshFruitMixin(object):
+    def get_context_data(self, **kwargs): 
+        context = super(FreshFruitMixin,
+            . self).get_context_data(**kwargs)
+        context["has_fresh_fruit"] = True 
+        return context
+
+class FruityFlavorView(FreshFruitMixin, TemplateView): 
+    template_name = "fruity_flavor.html"
+#+end_src
+** Which Django GCBV Should Be Used for What Task?
+[[{% asset_img table10_1.png %}]]
+** General Tips for Django CBVs
+*** Constraining Django CBV/GCBV Access to Authenticated Users
+Use django-braces LoginRequiredMixin
+#+begin_src python
+# flavors/views.py
+from django.views.generic import DetailView
+from braces.views import LoginRequiredMixin
+from .models import Flavor
+
+class FlavorDetailView(LoginRequiredMixin, DetailView):
+    model = Flavor
+#+end_src
+*** Performing Custom Actions on Views With Valid Forms
+#+begin_src python
+from django.views.generic import CreateView 
+from braces.views import LoginRequiredMixin 
+from .models import Flavor
+class FlavorCreateView(LoginRequiredMixin, CreateView):
+    model = Flavor
+    fields = ('title', 'slug', 'scoops_remaining')
+    def form_valid(self, form):
+        # Do custom logic here
+        return super(FlavorCreateView, self).form_valid(form)
+#+end_src
+To perform custom logic on form data that has already been validated, simply add the logic to formvalid().  e return value of formvalid() should be a django.http.HttpResponseRedirect.
+*** Performing Custom Actions on Views With Invalid Forms
+#+begin_src python
+from django.views.generic import CreateView 
+from braces.views import LoginRequiredMixin
+from .models import Flavor
+class FlavorCreateView(LoginRequiredMixin, CreateView): 
+    model = Flavor
+    def form_invalid(self, form):
+    # Do custom logic here .
+        return super(FlavorCreateView, self).form_invalid(form)
+#+end_src
+*** Using the View Object
+If you are using class-based views for rendering content, consider using the view object itself to provide access to properties and methods that can be called by other method and properties.  ey can also be called from templates. For example:
+#+begin_src python
+from django.utils.functional import cached_property
+from django.views.generic import UpdateView, TemplateView
+from braces.views import LoginRequiredMixin 
+from .models import Flavor
+from .tasks import update_users_who_favorited 
+
+class FavoriteMixin(object):
+    @cached_property
+    def likes_and_favorites(self):
+    """Returns a dictionary of likes and favorites""" 
+    likes = self.object.likes()
+    favorites = self.object.favorites()
+    return {
+        "likes": likes,
+        "favorites": favorites,
+        "favorites_count": favorites.count(),
+    }
+class FlavorUpdateView(LoginRequiredMixin, FavoriteMixin, UpdateView): 
+    model = Flavor
+    fields = ('title', 'slug', 'scoops_remaining')
+    def form_valid(self, form): 
+        update_users_who_favorited(
+            instance=self.object,
+            favorites=self.likes_and_favorites['favorites']
+        )
+        return super(FlavorCreateView, self).form_valid(form)
+class FlavorDetailView(LoginRequiredMixin, FavoriteMixin, TemplateView): 
+    model = Flavor
+#+end_src
+
+The nice thing about this is the various  avors/ app templates can now access this property:
+{% raw %}
+#+begin_src python
+{# flavors/base.html #}
+{% extends "base.html" %}
+
+{% block likes_and_favorites %} 
+  <ul>
+    <li>Likes: {{ view.likes_and_favorites.likes }}</li>
+    <li>Favorites: {{ view.likes_and_favorites.favorites_count }}</li> 
+  </ul>
+{% endblock likes_and_favorites %}
+#+end_src
+{% endraw %}
+** How GCBVs and Forms Fit Together
+First, let’s define a flavor model to use in this section’s view examples:
+#+begin_src python
+# flavors/models.py
+from django.core.urlresolvers import reverse 
+from django.db import models
+STATUS = (
+    (0, "zero"),
+    (1, "one"),
+)
+
+class Flavor(models.Model):
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True)
+    scoops_remaining = models.IntegerField(default=0, choices=STATUS)
+    def get_absolute_url(self):
+        return reverse("flavors:detail", kwargs={"slug": self.slug})
+#+end_src
+*** Views + ModelForm Example
+Here we have the following views:
+1. FlavorCreateView corresponds to a form for adding new flavors.
+2. FlavorUpdateView corresponds to a form for editing existing flavors.
+3. FlavorDetailView corresponds to the con rmation page for both  avor creation and flavor updates.
+Views:
+#+begin_src python
+# flavors/views.py
+from django.contrib import messages
+from django.views.generic import CreateView, UpdateView, DetailView
+from braces.views import LoginRequiredMixin 
+from .models import Flavor
+
+class FlavorActionMixin(object):
+    fields = ('title', 'slug', 'scoops_remaining')
+    @property
+    def success_msg(self):
+        return NotImplemented
+
+    def form_valid(self, form):
+        messages.info(self.request, self.success_msg)
+        return super(FlavorActionMixin, self).form_valid(form)
+
+class FlavorCreateView(LoginRequiredMixin, FlavorActionMixin, CreateView):
+    model = Flavor
+    success_msg = "Flavor created!"
+class FlavorUpdateView(LoginRequiredMixin, FlavorActionMixin, UpdateView):
+    model = Flavor
+    success_msg = "Flavor updated!"
+class FlavorDetailView(DetailView):
+    model = Flavor
+#+end_src
+
+Template:
+{% raw %}
+#+begin_src python
+{# templates/flavors/flavor_detail.html #}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+    <li id="message_{{ forloop.counter }}"
+        {% if message.tags %} class="{{ message.tags }}" .
+          {% endif %}>
+        {{ message }}
+    </li>
+    {% endfor %} 
+  </ul>
+{% endif %}
+#+end_src
+{% endraw %}
+*** Views + Form Example
+Implemente flavor search page
+We add the following code to flavors/views.py:
+#+begin_src python
+from django.views.generic import ListView
+from .models import Flavor
+
+class FlavorListView(ListView): 
+    model = Flavor
+    def get_queryset(self):
+    # Fetch the queryset from the parent get_queryset
+        queryset = super(FlavorListView, self).get_queryset()
+
+        # Get the q GET parameter
+        q = self.request.GET.get("q") 
+        if q:
+            # Return a filtered queryset
+            return queryset.filter(title__icontains=q) 
+        # Return the base queryset
+        return queryset
+#+end_src
+
+Template:
+{% raw %}
+#+begin_src python
+{# templates/flavors/_flavor_search.html #}
+{% comment %}
+  Usage: {% include "flavors/_flavor_search.html" %}
+{% endcomment %}
+<form action="{% url "flavor_list" %}" .method="GET">
+  <input type="text" name="q" />
+  <button type="submit">search</button> 
+</form>
+#+end_src
+{% endraw %}
+** Using Just django.views.generic.View
+What we find really useful, even on projects which use a lot of generic class-based views, is using the django.views.generic.View class with a GET method for displaying JSON, PDF or other non-HTML content. All the tricks that we’ve used for rendering CSV, Excel, and PDF  les in function-based views apply when using the GET method. For example:
+
+#+begin_src python
+from django.http import HttpResponse .
+from django.shortcuts import get_object_or_404
+from django.views.generic import View
+from braces.views import LoginRequiredMixin
+from .models import Flavor
+from .reports import make_flavor_pdf
+
+class PDFFlavorView(LoginRequiredMixin, View): 
+    # Get the flavor
+    def get(self, request, *args, **kwargs):
+        flavor = get_object_or_404(Flavor, slug=kwargs['slug'])
+        # create the response
+        response = HttpResponse(content_type='application/pdf')
+        # generate the PDF stream and attach to the response
+        response = make_flavor_pdf(response, flavor)
+        return response
+#+end_src
+* Form Fundamentals
+** Validate All Incoming Data With Django Forms
+舉個input data為csv file的例子
+Bad Example: 
+#+begin_src python
+import csv import StringIO
+from .models import Purchase 
+
+def add_csv_purchases(rows):
+    rows = StringIO.StringIO(rows)
+    records_added = 0
+    # Generate a dict per row, with the first CSV row being the keys 
+    for row in csv.DictReader(rows, delimiter=","):
+        # DON'T DO THIS: Tossing unvalidated data into your model.
+        Purchase.objects.create(**row)
+        records_added += 1
+    return records_added
+#+end_src
+以上Bad example在Purchase create前需要自己寫input data驗證code
+
+Good Example:
+#+begin_src python
+import csv import StringIO
+from django import forms
+from .models import Purchase, Seller 
+
+class PurchaseForm(forms.ModelForm):
+    class Meta:
+        model = Purchase
+    def clean_seller(self):
+        seller = self.cleaned_data["seller"] 
+        try:
+            Seller.objects.get(name=seller) 
+        except Seller.DoesNotExist:
+            msg = "{0} does not exist in purchase #{1}.".format(
+                seller,
+                self.cleaned_data["purchase_number"]
+            )
+        raise forms.ValidationError(msg) return seller
+
+def add_csv_purchases(rows):
+    rows = StringIO.StringIO(rows)
+    records_added = 0
+    errors = []
+    # Generate a dict per row, with the first CSV row being the k
+    for row in csv.DictReader(rows, delimiter=","):
+        # Bind the row data to the PurchaseForm. 
+        form = PurchaseForm(row)
+        # Check to see if the row data is valid. 
+        if form.is_valid():
+            # Row data is valid so save the record.
+            form.save()
+            records_added += 1
+        else: 
+            errors.append(form.errors)
+    return recordded, errors
+#+end_src
+利用django ModelForm的is_valid來做input驗證
+** Always Use CSRF Protection and POST With HTTP Forms That Modify Data
+You should use Django’s CsrfViewMiddleware as blanket protection across your site rather than manually decorating views with csrf protect.
+You should use Django’s CSRF protection even when posting data via AJAX.
+** Understand How to Add Django Form Instance Attributes
+Inserting the request.user object into forms
+form:
+#+begin_src python
+from django import forms
+from .models import Taster
+class TasterForm(forms.ModelForm):
+    class Meta:
+        model = Taster
+
+    def __init__(self, *args, **kwargs):
+        # set the user as an attribute of the form 
+        self.user = kwargs.pop('user')
+        super(TasterForm, self).__init__(*args, **kwargs)
+#+end_src
+
+view:
+#+begin_src python
+from django.views.generic import UpdateView 
+from braces.views import LoginRequiredMixin
+from .forms import TasterForm 
+from .models import Taster
+
+class TasterUpdateView(LoginRequiredMixin, UpdateView): 
+    model = Taster
+    form_class = TasterForm
+    success_url = "/someplace/"
+    def get_form_kwargs(self):
+        """This method is what injects forms with their keyword arguments.""" 
+        # grab the current set of form #kwargs
+        kwargs = super(TasterUpdateView, self).get_form_kwargs()
+        # Update the kwargs with the user_id
+        kwargs['user'] = self.request.user
+        return kwargs
+#+end_src
+** Know How Form Validation Works
+Form validation workflow:
++ If the form has bound data, form.is valid() calls the form.full clean() method.
++ form.fullclean() iterates through the form fields and each field validates itself:
+  - Data coming into the  eld is coerced into Python via the to python() method or raises a ValidationError.
+  - Data is validated against  eld-speci c rules, including custom validators. Failure raises a ValidationError.
+  - If there are any custom clean <field>() methods in the form, they are called at this time.
++ form.fullclean() executes the form.clean() method.
++ If it’s a ModelForm instance, form. post clean() does the following:
+  - Sets ModelForm data to the Model instance, regardless of whether form.is valid() is True or False.
+  - Calls the model’s clean() method. For reference, saving a model instance through the ORM does not call the model’s clean() method.
+*** ModelForm Data Is Saved to the Form, Then the Model In- stance
+In a ModelForm, form data is saved in two distinct steps:
+1. First, form data is saved to the form instance.
+2. Later, form data is saved to the model instance.
+
+For example, perhaps you need to catch the details of failed submission attempts for a form, saving both the user-supplied form data as well as the intended model instance changes.
+
+#+begin_src python
+# core/models.py
+from django.db import models
+
+class ModelFormFailureHistory(models.Model):
+    form_data = models.TextField()
+    model_data = models.TextField()
+#+end_src
+
+#+begin_src python
+# flavors/views.py import json
+from django.contrib import messages 
+from django.core import serializers
+from core.models import ModelFormFailureHistory 
+
+class FlavorActionMixin(object):
+    @property
+    def success_msg(self):
+        return NotImplemented
+    def form_valid(self, form):
+        messages.info(self.request, self.success_msg)
+        return super(FlavorActionMixin, self).form_valid(form)
+    def form_invalid(self, form):
+        """Save invalid form and model data for later reference.""" 
+        form_data = json.dumps(form.cleaned_data)
+        model_data = serializers.serialize("json",
+                    [form.instance])[1:-1]
+        ModelFormFailureHistory.objects.create(
+            form_data=form_data,
+            model_data=model_data
+        )
+        return super(FlavorActionMixin, self).form_invalid(form)
+#+end_src
+** Add Errors to Forms with Form.add error()
+We can streamline Form.clean() with the Form.add error() method.
+#+begin_src python
+from django import forms
+class IceCreamReviewForm(forms.Form): 
+    # Rest of tester form goes here ...
+    def clean(self):
+        cleaned_data = super(TasterForm, self).clean()
+        flavor = cleaned_data.get("flavor")
+        age = cleaned_data.get("age")
+        if flavor == 'coffee' and age < 3:
+            # Record errors that will be displayed later. 
+            msg = u"Coffee Ice Cream is not for Babies." 
+            self.add_error('flavor', msg) 
+            self.add_error('age', msg)
+        # Always return the full collection of cleaned data. 
+        return cleaned_data
+#+end_src
+* Common Patterns for Forms
+** Pattern 1: Simple ModelForm With Default Validators
+#+begin_src python
+# flavors/views.py
+from django.views.generic import CreateView, UpdateView
+from braces.views import LoginRequiredMixin
+from .models import Flavor
+class FlavorCreateView(LoginRequiredMixin, CreateView):
+    model = Flavor
+    fields = ('title', 'slug', 'scoops_remaining')
+class FlavorUpdateView(LoginRequiredMixin, UpdateView): 
+    model = Flavor
+    fields = ('title', 'slug', 'scoops_remaining')
+#+end_src
++ FlavorCreateView and FlavorUpdateView are assigned Flavor as their model.
++ Both views auto-generate a ModelForm based on the Flavor model.
++ Those ModelForms rely on the default field validation rules of the Flavor model.
+** Pattern 2: Custom Form Field Validators in ModelForms
+write validator:
+#+begin_src python
+# core/validators.py
+from django.core.exceptions import ValidationError
+def validate_tasty(value):
+    """Raise a ValidationError if the value doesn't start with the word 'Tasty'."""
+    if not value.startswith(u"Tasty"): 
+        msg = u"Must start with Tasty" 
+        raise ValidationError(msg)
+#+end_src
+In Django, a custom field validator is simply a function that raises an error if the submitted argument doesn’t pass its test.
+
+validator可以加在兩個地方
+*** put validator in Model
+#+begin_src python
+# core/models.py
+from django.db import models
+from .validators import validate_tasty 
+
+class TastyTitleAbstractModel(models.Model):
+    title = models.CharField(max_length=255, validators=[validate_tasty])
+    class Meta: 
+        abstract = True
+#+end_src
+#+begin_src python
+# flavors/models.py
+from django.core.urlresolvers import reverse 
+from django.db import models
+from core.models import TastyTitleAbstractModel .
+
+class Flavor(TastyTitleAbstractModel):
+    slug = models.SlugField()
+    scoops_remaining = models.IntegerField(default=0)
+    def get_absolute_url(self):
+        return reverse("flavors:detail", kwargs={"slug": self.slug})
+#+end_src
+*** put validator in Form
+#+begin_src python
+# flavors/forms.py
+from django import forms
+from core.validators import validate_tasty from .models import Flavor
+
+class FlavorForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(FlavorForm, self).__init__(*args, **kwargs)
+        self.fields["title"].validators.append(validate_tasty)
+        self.fields["slug"].validators.append(validate_tasty)
+    class Meta:
+        model = Flavor
+#+end_src
+#+begin_src python
+# flavors/views.py
+from django.contrib import messages
+from django.views.generic import CreateView, UpdateView, DetailView
+from braces.views import LoginRequiredMixin 
+from .models import Flavor
+from .forms import FlavorForm 
+
+class FlavorActionMixin(object):
+    model = Flavor
+    fields = ('title', 'slug', 'scoops_remaining')
+    @property
+    def success_msg(self):
+        return NotImplemented
+    def form_valid(self, form): 
+        messages.info(self.request, self.success_msg)
+        return super(FlavorActionMixin, self).form_valid(form)
+class FlavorCreateView(LoginRequiredMixin, FlavorActionMixin, CreateView):
+    success_msg = "created"
+    # Explicitly attach the FlavorForm class
+    form_class = FlavorForm
+class FlavorUpdateView(LoginRequiredMixin, FlavorActionMixin, UpdateView):
+    success_msg = "updated"
+    # Explicitly attach the FlavorForm class
+    form_class = FlavorForm
+class FlavorDetailView(DetailView): 
+    model = Flavor
 #+end_src
 * Reference
 此筆記大多來自這本書：
