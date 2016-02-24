@@ -12,7 +12,32 @@ django學習筆記
 #+END_HTML
 
 * Layout Django Project
-直接參考github上大大寫好的layout工具吧
+For Example:
+icecreamratings project/: git repository root
+icecreamratings/: project root
+products/, ratings/...etc: app root
+#+begin_src sh
+icecreamratings_project/
+    .gitignore
+    Makefile
+    docs/
+    README.rst
+    requirements.txt
+    icecreamratings/
+        manage.py
+        media/  # Development ONLY!
+        products/
+        profiles/
+        ratings/
+        static/
+        templates/
+        config/
+            __init__.py
+            settings/
+            urls.py
+            wsgi.py
+#+end_src
+可參考github上大大寫好的django project layout工具吧
 https://github.com/pydanny/cookiecutter-django
 
 * Setting Files
@@ -1067,6 +1092,493 @@ class FlavorUpdateView(LoginRequiredMixin, FlavorActionMixin, UpdateView):
 class FlavorDetailView(DetailView): 
     model = Flavor
 #+end_src
+** Pattern 3: Overriding the Clean Stage of Validation
+use cases:
++ Multi-field validation
++ Validation involving existing data from the database that has already been validate
+
+Django provides a second stage and process for validating incoming data, this time via the clean() method and clean <field name>() methods.
++ clean() validate two or more fields against each other.
++ clean <field name>() validate against persistent data.
+
+Example:
+clean slug(): prevent users from ordering flavors that are out of stock
+clean(): validate the flavor and toppings fields against each other
+#+begin_src python
+# flavors/forms.py
+from django import forms
+from flavors.models import Flavor
+
+class IceCreamOrderForm(forms.Form):
+    """Normally done with forms.ModelForm. But we use forms.Form here
+        to demonstrate that these sorts of techniques work on every
+        type of form.
+    """
+    slug = forms.ChoiceField("Flavor")
+    toppings = forms.CharField()
+
+    def __init__(self, *args, **kwargs): 
+        super(IceCreamOrderForm, self).__init__(*args,
+                **kwargs)
+        # We dynamically set the choices here rather than
+        # in the flavor field definition. Setting them in
+        # the field definition means status updates won't
+        # be reflected in the form without server restarts.
+        self.fields["slug"].choices = [
+            (x.slug, x.title) for x in Flavor.objects.all() 
+        ]
+        # NOTE: We could filter by whether or not a flavor
+        #       has any scoops, but this is an example of
+        #       how to use clean_slug, not filter().
+
+    def clean_slug(self):
+        slug = self.cleaned_data["slug"]
+        if Flavor.objects.get(slug=slug).scoops_remaining <= 0:
+            msg = u"Sorry, we are out of that flavor."
+            raise forms.ValidationError(msg) 
+        return slug
+
+    def clean(self):
+        cleaned_data = super(IceCreamOrderForm, self).clean()
+        slug = cleaned_data.get("slug", "")
+        toppings = cleaned_data.get("toppings", "")
+        # Silly "too much chocolate" validation example
+        if u"chocolate" in slug.lower() and \ u"chocolate" in toppings.lower():
+            msg = u"Your order has too much chocolate."
+            raise forms.ValidationError(msg) return cleaned_data
+#+end_src
+** Pattern 4: Hacking Form Fields (2 CBVs, 2 Forms, 1 Model)
+example:
+IceCreamStore在create時只需要填入title, address，update時再強制其補上phone, description
+
+IceCreamStore Model:
+#+begin_src python
+from django.core.urlresolvers import reverse 
+from django.db import models
+
+class IceCreamStore(models.Model):
+    title = models.CharField(max_length=100) 
+    block_address = models.TextField() .
+    phone = models.CharField(max_length=20, blank=True) 
+    description = models.TextField(blank=True)
+
+    def get_absolute_url(self):
+        return reverse("store_detail", kwargs={"pk": self.pk})
+#+end_src
+
+First we see the bad approach:
+#+begin_src python
+# stores/forms.py
+from django import forms
+from .models import IceCreamStore
+
+class IceCreamStoreUpdateForm(forms.ModelForm):
+    # Don't do this! Duplication of the model field!
+    phone = forms.CharField(required=True)
+    # Don't do this! Duplication of the model field!
+    description = forms.TextField(required=True)
+
+    class Meta:
+    model = IceCreamStore
+#+end_src
+上面的方法幾乎是copy了model中的field，想像一下若我們需要在description中加入help text，就必須同時在model與form中同時加上不然沒有作用，這不是一個好的設計
+
+Now we use form.fields[].required to do this.
+Form:
+#+begin_src python
+# stores/forms.py
+from django import forms
+from .models import IceCreamStore
+
+class IceCreamStoreCreateForm(forms.ModelForm):
+    class Meta:
+        model = IceCreamStore
+        fields = ("title", "block_address", )
+
+class IceCreamStoreUpdateForm(IceCreamStoreCreateForm):
+    def __init__(self, *args, **kwargs): 
+        super(IceCreamStoreUpdateForm,
+                self).__init__(*args, **kwargs)
+        self.fields["phone"].required = True
+        self.fields["description"].required = True
+    class Meta(IceCreamStoreCreateForm.Meta):
+        # show all the fields!
+        fields = ("title", "block_address", "phone", "description", )
+#+end_src
+Views:
+#+begin_src python
+# stores/views
+from django.views.generic import CreateView, UpdateView
+from .forms import IceCreamStoreCreateForm 
+from .forms import IceCreamStoreUpdateForm 
+from .models import IceCreamStore
+
+class IceCreamCreateView(CreateView):
+    model = IceCreamStore
+    form_class = IceCreamStoreCreateForm
+
+class IceCreamUpdateView(UpdateView): 
+    model = IceCreamStore
+    form_class = IceCreamStoreUpdateForm
+#+end_src
+** Pattern 5: Reusable Search Mixin View
+In this example, we’re going to cover how to reuse a search form in two views that correspond to two different models.
+simple search mixin for our view:
+#+begin_src python
+# core/views.py
+class TitleSearchMixin(object):
+
+    def get_queryset(self):
+        # Fetch the queryset from the parent's get_queryset 
+        queryset = super(TitleSearchMixin, self).get_queryset()
+        # Get the q GET parameter
+        q = self.request.GET.get("q") 
+        if q:
+            # return a filtered queryset
+            return queryset.filter(title__icontains=q) 
+        # No q is specified so we return queryset 
+        return queryset
+#+end_src
+
+views:
+#+begin_src python
+# add to flavors/views.py
+from django.views.generic import ListView
+from core.views import TitleSearchMixin 
+from .models import Flavor
+
+class FlavorListView(TitleSearchMixin, ListView): 
+    model = Flavor
+#+end_src
+#+begin_src python
+# add to store/views.py
+from django.views.generic import ListView
+from core.views import TitleSearchMixin 
+from .models import Store
+
+class IceCreamStoreListView(TitleSearchMixin, ListView):
+    model = Store
+#+end_src
+
+template:
+{% raw %}
+#+begin_src html
+{# form to go into stores/store_list.html template #} 
+<form action="" method="GET">
+  <input type="text" name="q" /> 
+  <button type="submit">search</button>
+</form>
+#+end_src
+#+begin_src html
+{# form to go into flavors/flavor_list.html template #} 
+<form action="" method="GET">
+  <button type="submit">search</button>
+  <input type="text" name="q" /> 
+</form>
+#+end_src
+{% endraw %}
+* Templates
+** Keep Templates Mostly in templates/
+Template layout:
+#+begin_src sh
+templates/
+    base.html
+    ... (other sitewide templates in here)
+    freezers/
+        ("freezers" app templates in here)
+#+end_src
+
+However, some tutorials advocate putting templates within a subdirectory of each app. We find that the extra nesting is a pain to deal with
+#+begin_src sh
+ freezers/
+     templates/
+         freezers/
+             ... ("freezers" app templates in here)
+ templates/
+     base.html
+     ... (other sitewide templates in here)
+#+end_src
+** Template Architecture Patterns
+*** 2-Tier Template Architecture Example
+all templates inherit from a single root base.html
+#+begin_src sh
+templates/
+    base.html
+    dashboard.html # extends base.html
+    profiles/
+        profile_detail.html # extends base.html
+        profile_form.html # extends base.html
+#+end_src
+This is best for sites with a consistent overall layout from app to app.
+*** 3-Tier Template Architecture Example
++ Each app has a base_<app name>.html template. App-level base templates share a common parent base.html template.
++ Templates within apps share a common parent base_<app name>.html template.
++ Any template at the same level as base.html inherits base.html.
+#+begin_src sh
+templates/
+    base.html
+    dashboard.html # extends base.html
+    profiles/
+        base_profiles.html # extends base.html
+        profile_detail.html # extends base_profiles.html
+        profile_form.html # extends base_profiles.html
+#+end_src
+The 3-tier architecture is best for websites where each section requires a distinctive layout. For example, a news site might have a local news section, a classified ads section, and an events section. Each of these sections requires its own custom layout.
+*** Flat Is Better Than Nested
+template層數越少越好維護
+** Limit Processing in Templates
+Whenever you iterate over a queryset in a template, ask yourself the following questions:
++ How large is the queryset? Looping over gigantic querysets in your templates is almost always a bad idea.
++ How large are the objects being retrieved? Are all the fields needed in this template? 
++ During each iteration of the loop, how much processing occurs?
+
+Let’s now explore some examples of template code that can be rewritten more efficiently.
+Model:
+#+begin_src python
+# vouchers/models.py
+from django.core.urlresolvers import reverse 
+from django.db import models
+from .managers import VoucherManager
+
+class Voucher(models.Model):
+    """Vouchers for free pints of ice c.ream.""" 
+    name = models.CharField(max_length=100) 
+    email = models.EmailField()
+    address = models.TextField()
+    birth_date = models.DateField(blank=True) 
+    sent = models.BooleanField(default=False) 
+    redeemed = models.BooleanField(default=False)
+    objects = VoucherManager()
+#+end_src
+*** Gotcha 1: Aggregation in Templates
++ Don’t iterate over the entire voucher list in your template’s JavaScript section, using JavaScript variables to hold age range counts.
++ Don’t use the add template  lter to sum up the voucher counts.
+
+*** Gotcha 2: Filtering With Conditionals in Templates
+A very bad way to implement this would be with giant loops and if statements at the template level.
+Bad Example:
+{% raw %}
+#+begin_src python
+<h2>Greenfelds Who Want Ice Cream</h2> 
+<ul>
+{% for voucher in voucher_list %}
+    {# Don't do this: conditional filtering in templates #}
+    {% if "greenfeld" in voucher.name.lower %}
+        <li>{{ voucher.name }}</li> 
+    {% endif %}
+{% endfor %} 
+</ul>
+
+<h2>Roys Who Want Ice Cream</h2> 
+<ul>
+{% for voucher in voucher_list %}
+    {# Don't do this: conditional filtering in templates #}
+    {% if "roy" in voucher.name.lower %}
+        <li>{{ voucher.name }}</li> 
+    {% endif %}
+{% endfor %} 
+</ul>
+#+end_src
+{% endraw %}
+
+Good Example
+views:
+#+begin_src python
+
+# vouchers/views.py
+from django.views.generic import TemplateView
+from .models import Voucher
+
+class GreenfeldRoyView(TemplateView):
+    template_name = "vouchers/views_conditional.html"
+    def get_context_data(self, **kwargs):
+        context = super(GreenfeldRoyView, self).get_context_data(**kwargs) 
+        context["greenfelds"] = Voucher.objects.filter(name__icontains="greenfeld") 
+        context["roys"] = Voucher.objects.filter(name__icontains="roy") 
+        return context
+#+end_src
+template:
+{% raw %}
+#+begin_src python
+<h2>Greenfelds Who Want Ice Cream</h2> 
+<ul>
+{% for voucher in greenfelds %}
+    <li>{{ voucher.name }}</li> 
+{% endfor %}
+</ul>
+
+<h2>Roys Who Want Ice Cream</h2> 
+<ul>
+{% for voucher in roys %}
+    <li>{{ voucher.name }}</li> 
+{% endfor %}
+</ul>
+#+end_src
+{% endraw %}
+
+*** Gotcha 3: Complex Implied Queries in Templates
+Bad Example:
+{% raw %}
+#+begin_src python
+{# list generated via User.object.all() #}
+<h1>Ice Cream Fans and their favorite flavors.</h1> 
+<ul>
+{% for user in user_list %}
+    <li>
+        {{ user.name }}:
+        {# DON'T DO THIS: Generated implicit query per user #}
+        {{ user.flavor.title }}
+        {# DON'T DO THIS: Second implicit query per user!!! #}
+        {{ user.flavor.scoops_remaining }}
+    </li> 
+{% endfor %}
+</ul>
+#+end_src
+{% endraw %}
+
+One quick correction is to use the Django ORM’s *select related()* method:
+{% raw %}
+#+begin_src python
+{% comment %}
+List generated via User.object.all().select_related("flavors") 
+{% endcomment %}
+<h1>Ice Cream Fans and their favorite flavors.</h1>
+<ul>
+{% for user in user_list %}
+    <li>
+        {{ user.name }}:
+        {{ user.flavor.title }}
+        {{ user.flavor.scoops_remaining }} 
+    </li>
+{% endfor %} 
+</ul>
+#+end_src
+{% endraw %}
+*** Gotcha 4: Hidden CPU Load in Templates
+需要大量CPU LOAD的code不該在template中，例如save image to file system
+*** Gotcha 5: Hidden REST API Calls in Templates
+REST API call不該放在template中，由於REST API可能會跑很久
+建議在javascript code or view 中處理REST API call
+ + JavaScript code so after your project serves out its content, the client’s browser handles the work.  is way you can entertain or distract the client while they wait for data to load.
+ + The view’s Python code where slow processes might be handled in a variety of ways including message queues, additional threads, multiprocesses, or more.
+
+** Exploring Template Inheritance
+base.html:
+{% raw %}
+#+begin_src html
+{# simple base.html #} 
+{% load staticfiles %} 
+<html>
+<head>
+    <title>
+        {% block title %}Two Scoops of Django{% endblock title %}
+    </title>
+    {% block stylesheets %}
+        <link rel="stylesheet" type="text/css" href="{% static "css/project.css" %}">
+    {% endblock stylesheets %} </head>
+<body>
+    <div class="content">
+        {% block content %} 
+            <h1>Two Scoops</h1>
+        {% endblock content %} 
+    </div>
+</body> 
+</html>
+#+end_src
+{% endraw %}
+The base.html file contains the following features:
++ A title block containing “Two Scoops of Django”.
++ A stylesheets block containing a link to a project.css file used across our site.
++ A content block containing “<h1>Two Scoops</h1>”.
+{% raw %}
+| Template Tag | Purpose                                                                                                                                                                            |
+|--------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| {% load %}   | Loads the staticfiles built-in template tag library                                                                                                                                |
+| {% block %}  | Since base.html is a parent template, these define which child blocks can be filled in by child templates. We place links and scripts inside them so we can override if necessary. |
+| {% static %} | Resolves the named static media argument to the static media server.                                                                                                               |
+{% endraw %}
+
+we’ll have a simple about.html inherit the following from it:
++ A custom title.
++ The original stylesheet and an additional stylesheet.
++ The original header, a sub header, and paragraph content.
++ The use of child blocks.
++ The use of the {{ block.super }} template variable.
+
+{% raw %}
+#+begin_src html
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block title %}About Audrey and Daniel{% endblock title %}
+{% block stylesheets %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "css/about.css" %}">
+{% endblock stylesheets %}
+{% block content %}
+    {{ block.super }}
+    <h2>About Audrey and Daniel</h2> 
+    <p>They enjoy eating ice cream</p>
+{% endblock content %}
+#+end_src
+it generates the following HTML:
+#+begin_src html
+<html> 
+<head>
+    <title>
+        About Audrey and Daniel
+    </title>
+    <link rel="stylesheet" type="text/css" href="/static/css/project.css"> 
+    <link rel="stylesheet" type="text/css" href="/static/css/about.css">
+</head> 
+<body>
+    <div class="content"> 
+        <h1>Two Scoops</h1>
+        <h2>About Audrey and Daniel</h2>
+        <p>They enjoy eating ice cream</p> 
+    </div>
+</body> 
+</html>
+#+end_src
+
+| Template Object   | Purpose                                                                                                                                                                                             |
+|-------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| {% extends %}     | Informs Django that about.html is inheriting or extending from base.html                                                                                                                            |
+| {% block %}       | Since about.html is a child template, block overrides the content provided by base.html. This means our title will render as <title>Audrey and Daniel</title>                                       |
+| {{ block.super }} | When placed in a child template's block, it ensures that the parent's content is also included in the block. In the content block of the about.html template, this will render <h1>Two Scoops</h1>. |
+{% endraw %}
+** block.super Gives the Power of Control
+Here are three examples:
+{% raw %}
+Template using both project.css and a custom link:
+#+begin_src html
+{% extends "base.html" %}
+{% block stylesheets %}
+    {{ block.super }} {# this brings in project.css #}
+    <link rel="stylesheet" type="text/css" href="{% static "css/custom.css" %}" /> 
+{% endblock %}
+#+end_src
+
+Dashboard template that excludes the project.css link:
+#+begin_src html
+{% extends "base.html" %}
+{% block stylesheets %} .
+    <link rel="stylesheet" type="text/css" href="{% static "css/dashboard.css" %}" />
+    {% comment %}
+        By not using {{ block.super }}, this block overrides the stylesheet block of base.html .
+    {% endcomment %}
+{% endblock %}
+#+end_src
+
+Template just linking the project.css file:
+#+begin_src html
+{% extends "base.html" %}
+{% comment %}
+    By not using {% block stylesheets %}, this template inherits the
+    stylesheets block from the base.html parent, in this case the
+    default project.css link.
+{% endcomment %}
+#+end_src
+{% endraw %}
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
