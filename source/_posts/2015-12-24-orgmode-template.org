@@ -3,7 +3,7 @@
 #+TAGS: emacs, orgmode, hexo
 #+LAYOUT: post
 #+CATEGORIES: orgmode
-#+OPTIONS: toc:t \n:t
+#+OPTIONS: toc:t \n:t ^:{}
 
 
 這是orgmode template，完全自用請勿參考

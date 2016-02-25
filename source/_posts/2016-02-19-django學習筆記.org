@@ -3,7 +3,7 @@
 #+TAGS: python, django
 #+LAYOUT: post
 #+CATEGORIES: python
-#+OPTIONS: toc:t \n:t
+#+OPTIONS: toc:t \n:t ^:{}
 
 django學習筆記
 隨筆亂記，陸續增加中
@@ -1579,6 +1579,351 @@ Template just linking the project.css file:
 {% endcomment %}
 #+end_src
 {% endraw %}
+** Useful Things to Consider
+*** Avoid Coupling Styles Too Tightly to Python Code
+Aim to control the styling of all rendered templates entirely via CSS and JS.
++ If you have magic constants in your Python code that are entirely related to visual design layout, you should probably move them to a CSS file.
++ The same applies to JavaScript.
+*** Common Conventions
+{% raw %}
++ We prefer underscores over dashes in template names, block names, and other names in tem- plates. Most Django users seem to follow this convention. Why? Well, because underscores are allowed in names of Python objects but dashes are forbidden.
++ We rely on clear, intuitive names for blocks. {% block javascript %} is good.
++ We include the name of the block tag in the endblock. Never write just {% endblock %}, include the whole {% endblock javascript %}.
++ Templates called by other templates are prefixed with ‘_’.  is applies to templates called via {% include %} or custom template tags. It does not apply to templates inheritance controls such as {% extends %} or {% block %}.
+{% endraw %}
+*** Location
+Templates should usually go into the root of the Django project, at the same level as the apps.
+The only exception is when you bundle up an app into a third-party package. That packages template directory should go into app directly.
+*** Use Named Context Objects
+{% raw %}
+use {{ topping list }} and {{ topping }} in your templates, instead of {{ object list }} and {{ object }}
+{% endraw %}
+*** Use URL Names Instead of Hardcoded Paths
+A common developer mistake is to hardcode URLs in templates like this:
+{% raw %}
+#+begin_src python
+<a href="/flavors/">
+#+end_src
+Instead, we use the {% url %} tag and references the names in our URLConf  les:
+#+begin_src python
+<a href="{% url 'flavors_list' %}">
+#+end_src
+{% endraw %}
+*** Debugging Complex Templates
+A trick recommended by Lennart Regebro is that when templates are complex and it becomes dif-  cult to determine where a variable is failing, you can force more verbose errors through the use of the string if invalid option in OPTIONS of your TEMPLATES setting:
+#+begin_src python
+# settings/local.py
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'APP_DIRS': True,
+        'OPTIONS':
+            'string_if_invalid': 'INVALID EXPRESSION: %s'
+    }, 
+]
+#+end_src
+** Error Page Templates
+It’s standard practice to create at least 404.html and 500.html templates.
+We suggest serving your error pages from a static file server (e.g. Nginx or Apache) as entirely self- contained static HTML files. That way, if your entire Django site goes down but your static  le server is still up, then your error pages can still be served.
+
+GitHub’s 404 and 500 error pages are great examples of fancy but entirely static, self-contained error pages:
++ https://github.com/404
++ https://github.com/500
++ All CSS styles are inline in the head of the same HTML page, eliminating the need for a separate stylesheet.
++ All images are entirely contained as data within the HTML page.  ere are no <img> links to external URLs.
++ All JavaScript needed for the page is contained within the HTML page. There are no external links to JavaScript assets.
+
+For more information, see the Github HTML Styleguide:
++ https://github.com/styleguide
+
+* Template Tags and Filters
+** Filters Are Functions
+Filters are functions that accept just one or two arguments.
+大多數的filters都只是作很簡單的事，通常都是將實作寫在utils.py，再由filters去import utils.py
+可參考django的default filters實作：https://github.com/django/django/blob/stable/1.8.x/django/template/defaultfilters.py
+django.template.defaultfilters.slugify是呼叫django.utils.text.slugify
+*** When to Write Filters
+*Filters are good for modifying the presentation of data*, and they can be readily reused in REST APIs and other output formats.
+** Custom Template Tags
++ Template Tags Are Harder to Debug
++ Template Tags Make Code Reuse Harder
++ The Performance Cost of Template Tags
+*** When to Write Template Tags
+Think these before writing custom tags:
++ Anything that causes a read/write of data might be better placed in a model or object method.
++ Since we implement a consistent naming standard across our projects, we can add an abstract base class model to our core.models module. Can a method or property in our project’s abstract base class model do the same work as a custom template tag?
+
+When should you write new template tags? We recommend writing them in situations where they are only responsible for rendering of HTML. For example, projects with very complex HTML layouts with many different models or data types might use them to create a more  exible, understandable template architecture.
+
+** Naming Your Template Tag Libraries
+The convention we follow is <app name>_tags.py.
++ flavors_tags.py 
++ blog_tags.py
+
+** Loading Your Template Tag Modules
+{% raw %}
+#+begin_src python
+{% extends "base.html" %}
+
+{% load flavors_tags %}
+#+end_src
+{% endraw %}
+*** Watch Out for This Crazy Anti-Pattern
+*Don't Use This*
+#+begin_src python
+# Don't use this code!
+# It's an evil anti-pattern! 
+from django import template 
+template.add_to_builtins(
+    "flavors.templatetags.flavors_tags"
+)
+#+end_src
+* Building REST APIs
+** Fundamentals of Basic REST API Design
+HTTP method:
+| Purpose of Request                                  | HTTP Method | Rough SQL equivalent |
+|-----------------------------------------------------+-------------+----------------------|
+| Create a new resource                               | POST        | INSERT               |
+| Read an existing resource                           | GET         | SELECT               |
+| Request the metadata of an existing resource        | HEAD        |                      |
+| Update an existing resource                         | PUT         | UPDATE               |
+| Update part of an existing resource                 | PATCH       | UPDATE               |
+| Delete an existing resource                         | DELETE      | DELETE               |
+| Return the supported HTTP methods for the given URL | OPTIONS     |                      |
+| Echo back the request                               | TRACE       |                      |
+| Tunneling over TCP/IP (usually not implemented)     | CONNECT     |                      |
+
+some common HTTP status codes:
+[[{% asset_img table16_2.png %}]]
+
+** Implementing a Simple JSON API
+*use django-rest-framework*
+model:
+#+begin_src python
+# flavors/models.py
+from django.core.urlresolvers import reverse 
+from django.db import models
+
+class Flavor(models.Model):
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True) 
+    scoops_remaining = models.IntegerField(default=0)
+
+    def get_absolute_url(self):
+        return reverse("flavors:detail", kwargs={"slug": self.slug})
+#+end_src
+Define the serializer class:
+#+begin_src python
+
+from rest_framework import serializers
+from .models import flavor
+
+class FlavorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = flavor
+        fields = ('title', 'slug', 'scoops_remaining')
+#+end_src
+Views:
+#+begin_src python
+# flavors/views
+from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import RetrieveUpdateDestroyAPIView 
+from .models import Flavor
+from .serializers import FlavorSerializer
+
+class FlavorCreateReadView(ListCreateAPIView):
+    queryset = Flavor.objects.all()
+    serializer_class = FlavorSerializer
+    lookup_field = 'slug'
+
+class FlavorReadUpdateDeleteView(RetrieveUpdateDestroyAPIView): 
+    queryset = Flavor.objects.all()
+    serializer_class = FlavorSerializer
+    lookup_field = 'slug'
+#+end_src
+flavors/urls.py:
+#+begin_src python
+
+# flavors/urls.py
+from django.conf.urls import url
+from flavors import views
+
+urlpatterns = [
+    url(
+        regex=r"ˆapi/$", 
+        view=views.FlavorCreateReadView.as_view(), 
+        name="flavor_rest_api"
+    ), 
+    url(
+        regex=r"ˆapi/(?P<slug>[-\w]+)/$",
+        view=views.FlavorReadUpdateDeleteView.as_view(),
+        name="flavor_rest_api"
+    )
+]
+#+end_src
+| Url                 | View                       | Url Name (same) |
+|---------------------+----------------------------+-----------------|
+| /flavors/api/       | FlavorCreateReadView       | flavor_rest api |
+| /flavors/api/:slug/ | FlavorReadUpdateDeleteView | flavor_rest api |
+
+Don't forget to add authenticate and permissions:
++ http://www.django-rest-framework.org/api-guide/authentication/
++ http://www.django-rest-framework.org/api-guide/permissions/
+** REST API Architecture
+*** Code for a Project Should Be Neatly Organized
+For example, we might place all our views, serializers, and other API components in an app titled apiv4.
+The downside is the possibility for the API app to become too large and disconnected from the apps that power it. Hence why we consider an alternative in the next subsection.
+*** Code for an App Should Remain in the App
+REST APIs are just views. For simpler, smaller projects, REST API views should go into views.py or viewsets.py modules
+The downside is that if there are too many small, interconnecting apps, it can be hard to keep track of the myriad of places API components are placed. Hence why we considered another approach in the previous subsection.
+
+*** Grouping API URLs
+If you have REST API views in multiple Django apps, how do you build a project-wide API that looks like this?
+#+begin_src sh
+api/flavors/ # GET, POST 
+api/flavors/:slug/ # GET, PUT, DELETE
+api/users/ # GET, POST
+api/users/:slug/ # GET, PUT, DELETE
+#+end_src
+{% raw %}
+#+begin_src python
+ # core/api.py
+"""Called from the project root's urls.py URLConf thus:
+        url(r"ˆapi/", include("core.api", namespace="api")), 
+"""
+from django.conf.urls import url
+from flavors import views as flavor_views 
+from users import views as user_views
+
+ urlpatterns = [
+     # {% url "api:flavors" %}
+     url(
+        regex=r"ˆflavors/$", 
+        view=flavor_views.FlavorCreateReadView.as_view(), 
+        name="flavors" .
+     ),
+
+     # {% url "api:flavors" flavor.slug %}
+     url(
+        regex=r"ˆflavors/(?P<slug>[-\w]+)/$", 
+        view=flavor_views.FlavorReadUpdateDeleteView.as_view(), 
+        name="flavors"
+     ),
+
+     # {% url "api:users" %}
+     url(
+        regex=r"ˆusers/$", 
+        view=user_views.UserCreateReadView.as_view(), 
+        name="users"
+     ),
+
+     # {% url "api:users" user.slug %}
+     url(
+          regex=r"ˆusers/(?P<slug>[-\w]+)/$", 
+          view=user_views.UserReadUpdateDeleteView.as_view(), 
+          name="users" .
+    ),
+]
+#+end_src
+{% endraw %}
+*** Version Your API
+It’s a good practice to abbreviate the urls of your API with the version number e.g. /api/v1/flavors or /api/v1/users and then as the API changes, /api/v2/flavors or /api/v2/users.
+** Shutting Down an External API
+1. Notify User
+2. Replace API With 410 Error View
+#+begin_src python
+# core/apiv1_shutdown.py
+from django.http import HttpResponseGone
+
+apiv1_gone_msg = """APIv1 was removed on April 2, 2015. Please switch to APIv3:
+<ul>
+    <li>
+        <a href="https://www.example.com/api/v3/">APIv3 Endpoint</a>
+    </li> 
+    <li>
+        <a href="https://example.com/apiv3_docs/">APIv3 Documentation</a>
+    </li> 
+    <li>
+        <a href="http://example.com/apiv1_shutdown/">APIv1 shut down notice</a>
+    </li>
+</ul> 
+"""
+def apiv1_gone(request):
+    return HttpResponseGone(apiv1_gone_msg)
+#+end_src
+** Rate Limiting Your API
+Rate limiting is when an API restricts how many requests can be made by a user of the API within a period of time.
+* Working With the Django Admin
+** It's Not for End Users
+The Django admin interface is designed for site administrators, not end users.
+** Add __str__ to Model
+The default admin page for a Django app looks something like this:
+[[{% asset_img figure19_2.png %}]]
+
+Implementing __str__():
+#+begin_src python
+from django.db import models
+from django.utils.encoding import python_2_unicode_compatible
+
+@python_2_unicode_compatible # For Python 3.4 and 2.7 
+class IceCreamBar(models.Model):
+    name = models.CharField(max_length=100)
+    shell = models.CharField(max_length=100)
+    filling = models.CharField(max_length=100)
+    has_stick = models.BooleanField(default=True)
+
+    def __str__(self): 
+        return self.name
+#+end_src
+The result:
+[[{% asset_img figure19_3.png %}]]
+
+If you still want to show data for additional  elds on the app’s admin list page, you can then use list display:
+#+begin_src python
+from django.contrib import admin
+from .models import IceCreamBar
+
+class IceCreamBarAdmin(admin.ModelAdmin):
+    list_display = ("name", "shell", "filling",)
+
+admin.site.register(IceCreamBar, IceCreamBarAdmin)
+#+end_src
+The result with the specified fields:
+[[{% asset_img figure19_5.png %}]]
+** Adding Callables to ModelAdmin Classes
+For example, it’s not uncommon to want to see the exact URL of a model instance in the Django admin.
+#+begin_src python
+from django.contrib import admin
+from django.core.urlresolvers import reverse 
+from django.utils.html import format_html
+from icecreambars.models import IceCreamBar 
+
+class IceCreamBarAdmin(admin.ModelAdmin):
+    list_display = ("name", "shell", "filling",)
+    readonly_fields = ("show_url",)
+
+    def show_url(self, instance):
+        url = reverse("ice_cream_bar_detail",
+                kwargs={"pk": instance.pk})
+        response = format_html("""<a href="{0}">{1}</a>""", url, url) 
+        return response
+
+    show_url.short_description = "Ice Cream Bar URL"
+    # Displays HTML tags
+    # Never set allow_tags to True against user submitted data!!!
+    show_url.allow_tags = True
+
+admin.site.register(IceCreamBar, IceCreamBarAdmin)
+#+end_src
+[[{% asset_img figure19_6.png %}]]
+** Django's Admin Documentation Generator
+1. pip install docutils into your project’s virtualenv. 
+2. Add django.contrib.admindocs to your INSTALLED APPS. 
+3. Add (r'ˆadmin/doc/', include('django.contrib.admindocs.urls')) to your root URLConf. Make sure it’s included before the r'ˆadmin/' entry, so that requests to /admin/doc/ don’t get handled by the latter entry.
+4. Optional : Linking to templates requires the ADMIN FOR setting to be con gured.
+5. Optional : Using the admindocs bookmarklets requires the XViewMiddleware to be installed.
+ 
+** Securing the Django Admin and Django Admin Docs
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
