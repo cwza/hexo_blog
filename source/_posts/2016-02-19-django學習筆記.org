@@ -1924,6 +1924,167 @@ admin.site.register(IceCreamBar, IceCreamBarAdmin)
 5. Optional : Using the admindocs bookmarklets requires the XViewMiddleware to be installed.
  
 ** Securing the Django Admin and Django Admin Docs
+* Dealing With the User Model
+** Use Django's Tools for Finding the User Model
+The advised way to get to the user class is as follows:
+#+begin_src python
+# Stock user model definition
+>>> from django.contrib.auth import get_user_model
+>>> get_user_model()
+<class 'django.contrib.auth.models.User'> .
+
+# When the project has a custom user model definition 
+>>> from django.contrib.auth import get_user_model 
+>>> get_user_model()
+<class 'profiles.models.UserProfile'>
+#+end_src
+*** Use settings.AUTH_USER_MODEL for Foreign Keys to User
+#+begin_src python
+from django.conf import settings 
+from django.db import models
+
+class IceCreamStore(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL)
+    title = models.CharField(max_length=255)
+#+end_src
+*** Don't Use get user model() for Foreign Keys to User
+This is bad, as it tends to create import loops.
+#+begin_src python
+# DON'T DO THIS!
+from django.db import models
+from django.contrib.auth import get_user_model
+
+class IceCreamStore(models.Model):
+    # This following line tends to create import loops.
+    owner = models.OneToOneField(get_user_model())
+    title = models.CharField(max_length=255)
+#+end_src
+** Custom User Fields for Django 1.8 Projects
+*** Option 1: Subclass AbstractUser
+Choose this option if you like Django’s User model  elds the way they are, but need extra fields.
+#+begin_src python
+# profiles/models.py
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils.translation import ugettext_lazy as _
+
+class KarmaUser(AbstractUser):
+    karma = models.PositiveIntegerField(verbose_name=_("karma"), default=0, blank=True)
+#+end_src
+The other thing you have to do is set this in your settings:
+#+begin_src python
+AUTH_USER_MODEL = "profiles.KarmaUser" .
+#+end_src
+*** Option 2: Subclass AbstractBaseUser
+AbstractBaseUser is the bare-bones option with only 3 fields: password, last login, and is active.
+Choose this option if:
++ You’re unhappy with the  elds that the User model provides by default, such as first name and last name.
++ You prefer to subclass from an extremely bare-bones clean slate but want to take advantage of the AbstractBaseUser sane default approach to storing passwords.
+
+If you want to go down this path, we recommend the following reading:
++ Official Django Documentation Example http://2scoops.co/1.8-custom-user-model-example
++ Source code of django-authtools (Especially admin.py,forms.py,andmodels.py) https://github.com/fusionbox/django-authtools
+*** Option 3: Linking Back From a Related Model
+/Use Case: Creating a Third Party Package/
++ We are creating a third-party package for publication on PyPI.
++ The package needs to store additional information per user, perhaps a Stripe ID or another payment gateway identifier.
++ We want to be as unobtrusive to the existing project code as possible. Loose coupling!
+
+/Use Case: Internal Project Needs/
++ We are working on our own Django project.
++ We want different types of users to have different fields.
++ We might have some users with a combination of different user types.
++ We want to handle this at the model level, instead of at other levels.
++ We want this to be used in conjunction with a custom user model from options #1 or #2.
+
+#+begin_src python
+# profiles/models.py
+from django.conf import settings
+from django.db import models
+from flavors.models import Flavor 
+
+class EaterProfile(models.Model):
+    # Default user profile
+    # If you do this you need to either have a post_save signal or
+    #     redirect to a profile_edit view on initial login.
+    user = models.OneToOneField(settings.AUTH_USER_MODEL)
+    favorite_ice_cream = models.ForeignKey(Flavor, null=True, blank=True)
+
+class ScooperProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL)
+    scoops_scooped = models.IntegerField(default=0) 
+
+class InventorProfile(models.Model):
+    user = models.OneToOneField(setting.s.AUTH_USER_MODEL)
+    flavors_invented = models.ManyToManyField(Flavor, null=True, blank=True)
+#+end_src
+* Third-Party Packages
+PyPI (https://pypi.python.org/pypi)
+Django Packages (https://www.djangopackages.com/)
+** Wiring Up Django Packages: The Basics
++ Step 1: Read the Documentation for the Package
++ Step 2: Add Package and Version Number to Your Requirements
++ Step 3: Install the Requirements Into Your Virtualenv
++ Step 4: Follow the Package's Installation Instructions Exactl
+* Testing
+** Useful Library for Testing Django Projects
+[[https://bitbucket.org/ned/coveragepy][coverage.py]]
+** How to Structure Tests
+/“Flat is better than nested,”/
+#+begin_src sh
+popsicles/
+    __init__.py
+    admin.py
+    forms.py
+    models.py
+    test_forms.py
+    test_models.py
+    test_views.py
+    views.py
+#+end_src
+** How to Write Unit Tests
+*** Each Test Method Tests One Thing
+example:
+#+begin_src python
+# flavors/test_api.py 
+import json
+from django.core.urlresolvers import reverse 
+from django.test import TestCase
+from flavors.models import Flavor
+
+class DjangoRestFrameworkTests(TestCase):
+    def setUp(self):
+        Flavor.objects.get_or_create(title="title1", slug="slug1") 
+        Flavor.objects.get_or_create(title="title2", slug="slug2")
+        self.create_read_url = reverse("flavor_rest_api")
+        self.read_update_delete_url = reverse("flavor_rest_api", kwargs={"slug": "slug1"})
+
+    def test_list(self):
+        response = self.client.get(self.create_read_url)
+        # Are both titles in the conten.t? 
+        self.assertContains(response, "title1") 
+        self.assertContains(response, "title2")
+
+    def test_detail(self):
+        response = self.client.get(self.read_update_delete_url) 
+        data = json.loads(response.content)
+        content = {"id": 1, "title": "title1", "slug": "slug1", "scoops_remaining": 0}
+        self.assertEquals(data, content)
+
+    def test_create(self):
+        post = {"title": "title3", "slug": "slug3"}
+        response = self.client.post(self.create_read_url, post) 
+        data = json.loads(response.content) 
+        self.assertEquals(response.status_code, 201)
+        content = {"id": 3, "title": "title3", "slug": "slug3", "scoops_remaining": 0}
+        self.assertEquals(data, content)
+        self.assertEquals(Flavor.objects.count(), 3)
+
+    def test_delete(self):
+        response = self.client.delete(self.read_update_delete_url) 
+        self.assertEquals(response.status_code, 204) 
+        self.assertEquals(Flavor.objects.count(), 1)
+#+end_src
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
