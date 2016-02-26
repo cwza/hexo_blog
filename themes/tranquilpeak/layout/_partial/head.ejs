@@ -90,6 +90,12 @@
             <meta class="swiftype" name="image" data-type="enum" content="<%- url_for(page.permalink.replace('.html', '/') + photo) %>" />
         <% }) %>
     <% } %>
+
+    <!--add google search console verification-->
+    <% if (is_home()) { %>
+        <meta name="google-site-verification" content="X54_1CkfXpJUuzjjbP2kLLQwBJKUqGiPc_Zx6vyap-Y" />
+    <% } %>
+
     <!--STYLES-->
     <%- css('assets/css/style.min.css') %>
     <!--STYLES END-->
