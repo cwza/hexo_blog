@@ -2085,6 +2085,572 @@ class DjangoRestFrameworkTests(TestCase):
         self.assertEquals(response.status_code, 204) 
         self.assertEquals(Flavor.objects.count(), 1)
 #+end_src
+*** For Views, When Possible Use the Request Factory
+The django.test.client.RequestFactory provides a way to generate a request instance that can be used as the first argument to any view.
+But the request factory doesn’t support middleware, including session and authentication.
+#+begin_src python
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.sessions.middleware import SessionMiddleware 
+from django.test import TestCase, RequestFactory
+from .views import cheese_flavors
+
+def add_middleware_to_request(request, .middleware_class): 
+    middleware = middleware_class() 
+    middleware.process_request(request)
+    return request
+
+def add_middleware_to_response(request, middleware_class): 
+    middleware = middleware_class() 
+    middleware.process_request(request)
+    return request
+
+class SavoryIceCreamTest(TestCase): 
+    def setUp(self):
+        # Every test needs access to the request factory.
+        self.factory = RequestFactory()
+
+    def test_cheese_flavors(self):
+        request = self.factory.get('/cheesy/broccoli/')
+        request.user = AnonymousUser()
+
+        # Annotate the request object with a session
+        request = add_middleware_to_request(request, SessionMiddleware)
+        request.session.save()
+
+        # process and test the request
+        response = cheese_flavors(request)
+        self.assertContains(response, "bleah!")
+#+end_src
+*** Don't Repeat Yourself Doesn't Apply to Writing Tests
+*** Don't Rely on Fixtures
+Rather than wrestle with  xtures, we’ve found it’s easier to write code that relies on the ORM. Other people like to use third-party packages.(factory boy, model mommy, mock)
+*** Things That Should Be Tested
+Everything! Seriously, you should test whatever you can, including:
+
+*Views:* Viewing of data, changing of data, and custom class-based view methods.
+*Models:* Creating/updating/deleting of models, model methods, model manager methods. 
+*Forms:* Form methods, clean() methods, and custom  elds.
+*Validators:* Really dig in and write multiple test methods against each custom validator you write. Pretend you are a malignant intruder attempting to damage the data in the site.
+*Signals:* Since they act at a distance, signals can cause grief especially if you lack tests on them. 
+*Filters:* Since  lters are essentially just functions accepting one or two arguments, writing tests for them should be easy.
+*Template* Tags: Since template tags can do anything and can even accept template context, writing tests often becomes much more challenging. This means you really need to test them, since otherwise you may run into edge cases.
+*Miscellany:* Context processors, middleware, email, and anything else not covered in this list. 
+*Failure* What happens when any of the above fail?
+
+*** Test for Failure
+It is up to us to learn how to test for the exceptions our code my throw:
++ https://docs.python.org/2/library/unittest.html#unittest.TestCase.assertRaises
++ http://pytest.org/latest/assert.html#assertions-about-expected-exceptions
+*** Use Mock to Keep Unit Tests From Touching the World
+during tests we should not access external APIs, receive emails or webhooks, or anything that is not part of of the tested action.
+when you are trying to write a unit test for a function that interacts with an external API, you have two choices:
++ Choice #1: Change the unit test to be an Integration Test.
++ Choice #2: Use the Mock library to fake the response from the external API.
+Test list_flavors_sorted():
+#+begin_src python
+import mock import unittest
+import icecreamapi
+from flavors.exceptions import CantListFlavors
+from flavors.utils import list_flavors_sorted 
+
+class TestIceCreamSorting(unittest.TestCase):
+    # Set up monkeypatch of icecreamapi.get_flavors() 
+    @mock.patch.object(icecreamapi, "get_flavors") 
+    def test_flavor_sort(self, get_flavors):
+        # Instructs icecreamapi.get_flavors() to return an unordered list.
+        get_flavors.return_value = ['chocolate', 'vanilla', 'strawberry', ]
+
+        # list_flavors_sorted() calls t.he icecreamapi.get_flavors()
+        # function. Since we've monkeypatched the function, it will always
+        #   return ['chocolate', 'strawberry', 'vanilla', ]. Which the.
+        #   list_flavors_sorted() will sort alphabetically
+        flavors = list_flavors_sorted()
+        self.assertEqual(
+            flavors,
+            ['chocolate', 'strawberry', 'vanilla', ]
+        )
+#+end_src
+Now let’s demonstrate how to test the behavior of the list flavors sorted() function when the Ice Cream API is innaccessible.
+#+begin_src python
+@mock.patch.object(icecreamapi, "get_flavors") 
+def test_flavor_sort_failure(self, get_flavors):
+    # Instructs icecreamapi.get_flavors() to throw a FlavorError.
+    get_flavors.side_effect = icecreamapi.FlavorError()
+
+    # list_flavors_sorted() catches the icecreamapi.FlavorError()
+    #   and passes on a CantListFlavors exception.
+    with self.assertRaises(CantListFlavors):
+        list_flavors_sorted()
+#+end_src
+As an added bonus for API authors, here’s how we test how code handles two different python- requests connection problems:
+#+begin_src python
+@mock.patch.object(requests, "get") 
+def test_request_failure(self, get)
+    """Test if the target site is innaccessible."""
+    get.side_effect = requests.exception.ConnectionError()
+
+    with self.assertRaises(CantListFlavors):
+        list_flavors_sorted()
+
+@mock.patch.object(requests, "get") 
+def test_request_failure(self, get)
+    """Test if we can handle SSL problems elegantly."""
+    get.side_effect = requests.exception.SSLError()
+
+    with self.assertRaises(CantListFlavors):
+        list_flavors_sorted()
+#+end_src
+*** Use Fancier Assertion Methods
++ https://docs.python.org/2/library/unittest.html#assert-methods
++ https://docs.python.org/3/library/unittest.html#assert-methods
++ https://docs.djangoproject.com/en/1.8/topics/testing/tools/#assertions
+We’ve found the following assert methods extremely useful:
++ assertRaises
++ Python 2.7: ListItemsEqual(), Python 3+ assertCountEqual()
++ assertDictEqual()
++ assertFormError()
++ assertContains() Check status 200, checks in response.content.
++ assertHTMLEqual() Amongst many things, ignores whitespace differences.
++ assertJSONEqual()
+
+*** Document the Purpose of Each Test
+** What About Integration Tests?
++ Selenium tests to con rm that an application works in the browser.
++ Actual testing against a third-party API instead of mocking responses. For example, Django Packages conducts periodic tests against GitHub, BitBucket, and PyPI API to ensure that its interaction with those systems is valid.
++ Interacting with http://requestb.in or http://httpbin.org/ to confirm the validity of out-bound requests.
++ Using http://runscope.com to validate that our API is working as expected.
+** Continuous Integration
+For projects of any size, we recommend setting up a continuous integration (CI) server to run the project’s test suite whenever code is committed and pushed to the project repo.
+** Setting Up the Test Coverage Game
+*** Step 1: Start Writing Tests
+*** Step 2: Run Tests and Generate Coverage Report
+In the command-line, at the <project root>, type:
+#+begin_src sh
+$ coverage run manage.py test --settings=twoscoops.settings.test
+#+end_src
+If we have nothing except for the default tests for two apps, we should get a response that looks like:
+#+begin_src sh
+  Creating test database for alias "default"...
+  ..
+  -----------------------------------------------
+  Ran 2 tests in 0.008s
+  OK
+  Destroying test database for alias "default"...
+#+end_src
+*** Step 3: Generate the Report!
+In the command-line, at the <project root>:
+#+begin_src sh
+$ coverage html --omit="admin.py"
+#+end_src
+After this runs, in the <project root> directory there is a new directory called htmlcov/ . In the htmlcov/ directory, open the index.html file using any browser.
+* Documentation
+** Use reStructuredText for Python Docs
+http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
+here is a quick primer of some very useful commands you should learn:
+#+begin_src sh
+Section Header
+==============
+
+**emphasis (bold/strong)**
+
+*italics*
+
+Simple link: http://django.2scoops.org
+Fancier Link: `Two Scoops of Django`_
+
+.. _Two Scoops of Django: https://django.2scoops.org
+
+Subsection Header
+-----------------
+
+#) An enumerated list item
+
+#) Second item
+
+ * First bullet
+
+ * Second bullet
+
+   * Indented Bullet
+
+   * Note carriage return and indents
+
+Literal code block::
+
+    def like():
+        print("I like Ice Cream")
+
+    for i in range(10):
+        like()
+
+Python colored code block (requires pygments):
+
+code-block:: python
+
+    # You need to "pip install pygments" to make this work.
+    for i in range(10): 
+        like()
+
+JavaScript colored code block:
+
+code-block:: javascript
+
+    console.log("Don't use alert()");
+#+end_src
+** Use Sphinx to Generate Documentation From reStructuredText
+Sphinx is a tool for generating nice-looking docs from your .rst  les. Output formats include HTML, LaTeX, manual pages, and plain text.
+Follow the instructions to generate Sphinx docs: http://sphinx-doc.org/.
+** What Docs Should Django Projects Contain?
+Here we provide a table that describes what we consider the absolute minimum documentation:
+[[{% asset_img table23_1.png %}]]
+
+** Additional Documentation Resources
++ http://www.python.org/dev/peps/pep-0257 Official speci cation on docstrings.
++ https://readthedocs.org/ Read the Docs is a free service that can host your Sphinx documentation.
++ http://pythonhosted.org/ Python Hosted is another free service for documentation hosting.
+* Finding and Reducing Bottlenecks
+** Should You Even Care?
+Remember, premature optimization is bad. If your site is small- or medium-sized and the pages are loading  ne, then it’s okay to skip this chapter.
+** Speed Up Query-Heavy Pages
+*** Find Excessive Queries With Django Debug Toolbar
+You’ll find bottlenecks such as:
++ Duplicate queries in a page.
++ ORM calls that resolve to many more queries than you expected.
++ Slow queries.
+*** Reduce the Number of Queries
++ Try using select_related() in your ORM calls to combine queries. It follows ForeignKey relations and combines more data into a larger query. If using CBVs, django-braces makes doing this trivial with the SelectRelatedMixin. 
++ For many-to-many and many-to-one relationships that can’t be optimized with select_related(), explore using prefetch_related() instead.
++ If the same query is being generated more than once per template, move the query into the Python view, add it to the context as a variable, and point the template ORM calls at this new context variable.
++ Implement caching using a key/value store such as Memcached.  en write tests to assert the number of queries run in a view. See http://2scoops.co/1.8-test-num-queries for instructions.
++ Use the django.utils.functional.cached_property decorator to cache in memory the result of method call for the life of an object instance. This is incredibly useful.
+*** Speed Up Common Queries
++ Make sure your indexes are helping speed up your most common slow queries. Look at the raw SQL generated by those queries, and index on the fields that you filter/sort on most frequently. Look at the generated WHERE and ORDER BY clauses.
++ Understand what your indexes are actually doing in production. Development machines will never perfectly replicate what happens in production, so learn how to analyze and understand what’s really happening with your database.
++ Look at the query plans generated by common queries.
++ Turn on your database’s slow query logging feature and see if any slow queries occur frequently.
++ Use django-debug-toolbar in development to identify potentially-slow queries defensively, before they hit production.
+
+*** Switch ATOMIC REQUESTS to False
+
+** Know What Doesn't Belong in the Database
+Three things that should never go into any large site’s relational database:
+*Logs.* Don’t add logs to the database. Logs may seem OK on the surface, especially in development. Yet adding this many writes to a production database will slow their performance. When the ability to easily perform complex queries against your logs is necessary, we recommend third-party services such as Splunk or Loggly, or use of document-based NoSQL databases.
+
+*Ephemeral data.* Don’t store ephemeral data in the database. What this means is data that re- quires constant rewrites is not ideal for use in relational databases.  is includes examples such as django.contrib.sessions, django.contrib.messages, and metrics. Instead, move this data to things like Memcached, Redis, Riak, and other non-relational stores.
+
+*Binary Data*
+** Cache Queries With Memcached or Redis
+Reference material:
++ https://docs.djangoproject.com/en/1.8/topics/cache/
++ https://github.com/sebleier/django-redis-cache/
+** Identify Specific Places to Cache
+Here are things to think about:
++ Which views/templates contain the most queries?
++ Which URLs are being requested the most?
++ When should a cache for a page be invalidated?
+** Compression and Minification of HTML, CSS, and JavaScript
++ Apache and Nginx compression modules
++ django-pipeline
+** Use Upstream Caching or a Content Delivery Network
+*Upstream caches* such as *Varnish* are very useful. They run in front of your web server and speed up web page or content serving signi cantly. See http://varnish-cache.org/.
+
+*Content Delivery Networks (CDNs)* like Fastly, Akamai, and Amazon Cloudfront serve static me- dia such as images, video, CSS, and JavaScript  les.  ey usually have servers all over the world, which serve out your static content from the nearest location. Using a CDN rather than serving static content from your application servers can speed up your projects.
+* Asynchronous Task Queues
+An asynchronous task queue is one where tasks are executed at a different time from when they are created, and possibly not in the same order they were created.
+** Do We Need a Task Queue?
+Here is a useful rule of thumb for determining if a task queue should be used: 
+*Results take time to process:* Task queue should probably be used.
+*Users can and should see results immediately:* Task queue should not be used.
+| Use Task Queue? | Issue                                                          |
+|-----------------+----------------------------------------------------------------|
+| Yes             | Sending bulk email                                             |
+| Yes             | Modifying files (including images)                             |
+| Yes             | Fetching large amounts of data from third-party Ice Cream APIs |
+| Yes             | Inserting or updating a lot of records into a table            |
+| No              | Updating a user profile                                        |
+| No              | Adding a blog or CMS entry                                     |
+| Yes             | Performing time-intensive calculations                         |
+| Yes             | Sending or receiving of webhooks                               |
+
++ Sites with small-to-medium amounts of traffic may never need a task queue for any of these actions.
++ Sites with larger amounts of traffic may discover that nearly every user action requires use of a task queue.
+** Choosing Task Queue Software
+Celery, Redis Queue, django-background-tasks, which to choose? Let’s go over their pros and cons:
+| Software                | Pros                                                                                                            | Cons                                                                                   |
+|-------------------------+-----------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------|
+| [[http://www.celeryproject.org/][Celery]]                  | Defacto Django standard, many different storage types, flexible, full-featured, great for high volume           | Challenging setup, overkill for slower traffic sites                                   |
+| [[http://python-rq.org/][Redis Queue]]             | Flexible, powered by Redis, lower memory footprint then Celery, great for high volume, can use django-rq or not | Not as many features as Celery, medium difficulty setup, Redis only option for storage |
+| [[https://pypi.python.org/pypi/django-background-tasks][django-background-tasks]] | Very easy setup, easy to use, good for small volume or batch jobs, uses Django ORM for backend                  | Uses Django ORM for backend, absolutely terrible for medium-to-high volume             |
+
+Here is our general rule of thumb:
++ For most high-to-low volume projects, we recommend Redis Queue.
++ For high-volume projects with the need for complex task management, we recommend Celery.
++ For small volume projects, especially for running of periodic batch jobs, we recommend django-background-tasks
+** Best Practices for Task Queues
+*** Treat Tasks Like Views
+we recommend that views contain as little code as possible, calling methods and functions from other places in the code base. We believe the same thing applies to tasks.
+you can put your task code into a function, put that function into a helper module, and then call that function from a task function.
+*** Tasks Aren't Free
+*** Only Pass JSON-Serializable Values to Task Functions
+That limits us to integers,  oats, strings, lists, tuples, and dictionaries. Don’t pass in complex objects.
+Passing in an object representing persistent data (ORM instances for example can cause a race condition.)
+*** Learn How to Monitor Tasks and Workers
+Some useful tools:
++ Celery: https://pypi.python.org/pypi/flower
++ Redis Queue: https://pypi.python.org/pypi/django-redisboard for using Redis Queue directly.
++ django-rq: https://pypi.python.org/pypi/django-rq for using django-rq.
++ django.contrib.admin for django-background-tasks.
+
+*** Logging!
+*** Monitor the Backlog
+As traffic increases, tasks can pile up if there aren’t enough workers. When we see this happening, it’s time to increase the number of workers.
+*** Periodically Clear Out Dead Tasks
+*** Use the Queue's Error Handling
++ Max retries for a task
++ Retry delays
+When a task fails, we like to wait at least 10 seconds before trying again. Even better, if the task queue software allows it, increase the delay each time an attempt is made.
+* Security
+** Know Django's Security Features
+Django 1.8’s security features include:
++ Cross-site scripting (XSS) protection.
++ Cross-site request forgery (CSRF) protection.
++ SQL injection protection.
++ Clickjacking protection.
++ Support for TLS/HTTPS/HSTS, including secure cookies.
++ Secure password storage, using the PBKDF2 algorithm with a SHA256 hash by default.
++ Automatic HTML escaping.
++ An expat parser hardened against XML bomb attacks.
++ Hardened JSON, YAML, and XML serialization/deserialization tools.
+
+** Turn Off DEBUG Mode in Production
+Keep in mind that when you turn off DEBUG mode, you will need to set ALLOWED HOSTS or risk raising a SuspiciousOperation error, which generates a 500 error that can be hard to debug.
+** Keep Your Secret Keys Secret
+** HTTPS Everywhere
+*** Use django.middleware.security.SecurityMiddleware
+The tool of choice for projects on Django 1.8+ for enforcing HTTPS/SSL across an entire site through middleware is built right in. To activate this middleware just follow these steps:
+1. Add django.middleware.security.SecurityMiddleware to the settings.MIDDLEWARE CLASSES definition.
+2. Set settings.SECURE SSL HOST to True.
+
+django.middleware.security.SecurityMiddleware Does Not Include static/media, static assets are typically served directly by the web
+server (nginx, Apache)
+*** Use Secure Cookies
+Your site should inform the target browser to never send cookies unless via HTTPS. You’ll need to set the following in your settings:
+#+begin_src python
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+#+end_src
+*** Use HTTP Strict Transport Security (HSTS)
+HSTS can be con gured at the web server level. Follow the instructions for your web server, platform- as-a-service, and Django itself (via settings.SECURE HSTS SECONDS).
+*** HTTPS Configuration Tools
+Mozilla provides a SSL con guration generator at the https://mozilla.github.io/server-side-tls/ssl-config-generator/
+Once you have a server set up (preferably a test server), use the Qualys SSL Labs server test at https://www.ssllabs.com/ssltest/ to see how well you did.
+** Use Allowed Hosts Validation
+We recommend that you avoid setting wildcard values here.
+https://docs.djangoproject.com/en/1.8/ref/settings/#allowed-hosts
+https://docs.djangoproject.com/en/1.8/ref/request-response/#django.http.HttpRequest.get_host
+** Always Use CSRF Protection With HTTP Forms That Modify Data
+** Obfuscate Primary Keys with UUIDs
+#+begin_src python
+import uuid as uuid_lib
+from django.db import models
+from django.utils.encoding import python_2_unicode_compatible
+
+@python_2_unicode_compatible
+class IceCreamPayment(models.Model):
+
+    uuid = models.UUIDField(
+        db_index=True,
+        default=uuid_lib.uuid4,
+        editable=False)
+
+    def __str__(self): 
+        return str(self.pk)
+#+end_src
+* Logging
+** When to Use Each Log Level
+In your production environment, we recommend using every log level except for DEBUG.
+*** Log Catastrophes With CRITICAL
+For example, if your code relies on an internal web service being available, and if that web service is part of your site’s core functionality, then you might log at the CRITICAL level anytime that the web service is inaccessible.
+*** Log Production Errors With ERROR
+whenever code raises an exception that is not caught, the event gets logged by Django using the following code:
+#+begin_src python
+
+# Taken directly from core Django code.
+# Used here to illustrate an example only, so don't
+# copy this into your project.
+logger.error("Internal Server Error: %s", request.path,
+    exc_info=exc_info,
+    extra={
+        "status_code": 500,
+        "request": request
+    }
+)
+#+end_src
+we recommend that you use the ERROR log level whenever you need to log an error that is worthy of being emailed to you or your site admins.
+*** Log Lower-Priority Problems With WARNING
+This level is good for logging events that are unusual and potentially bad, but not as bad as ERROR- level events.
+For example, when an incoming POST request is missing its csrf token, the event gets logged as follows:
+#+begin_src python
+# Taken directly from core Django code.
+# Used here to illustrate an example only, so don't
+# copy this into your project.
+logger.warning("Forbidden (%s): %s",
+               REASON_NO_CSRF_COOKIE, request.path,
+    extra={
+        "status_code": 403,
+        "request": request,
+} )
+#+end_src
+*** Log Useful State Information With INFO
+We recommend using this level to log any details that may be particularly important when analysis is needed. These include:
++ Startup and shutdown of important components not logged elsewhere
++ State changes that occur in response to important events
++ Changes to permissions, e.g. when users are granted admin access
+In addition to this, the INFO level is great for logging any general information that may help in performance analysis.
+*** Log Debug-Related Messages to DEBUG
+In development, we recommend using DEBUG and occasionally INFO level logging wherever you’d consider throwing a print statement into your code for debugging purposes.
+#+begin_src python
+import logging
+from django.views.generic import TemplateView
+from .helpers import pint_counter
+
+logger = logging.getLogger(__name__)
+
+class PintView(TemplateView):
+
+    def get_context_data(self, *args, **kwargs):
+        context = super(PintView, self).get_context_data(**kwargs) 
+        pints_remaining = pint_counter()
+        logger.debug("Only %d pints of ice cream left." % pints_remaining) 
+        return context
+#+end_src
+** Log Tracebacks When Catching Exceptions
+1. Logger.exception() automatically includes the traceback and logs at ERROR level.
+2. For other log levels, use the optional exc_info keyword argument.
+#+begin_src python
+import logging import requests
+
+logger = logging.getLogger(__name__)
+
+def get_additional_data(): 
+    try:
+        r = requests.get("http://example.com/something-optional/") 
+    except requests.HTTPError as e:
+        logger.exception(e)
+        logger.debug("Could not get additional data", exc_info=True)
+        return None 
+    return r
+#+end_src
+** One Logger Per Module That Uses Logging
+#+begin_src python
+# You can place this snippet at the top
+# of models.py, views.py, or any other
+# file where you need to log. 
+import logging
+
+logger = logging.getLogger(__name__)
+#+end_src
+If you’re running into a strange issue in production that you can’t replicate locally, you can temporarily turn on DEBUG logging for just the module related to the issue
+** Log Locally to Rotating Files
+A common way to set up log rotation is to use the UNIX logrotate utility with log- ging.handlers.WatchedFileHandler.
+Note that if you are using a platform-as-a-service, you might not be able to set up rotating log files. In this case, you may need to use an external logging service such as Loggly: http://loggly.com/.
+** Log settings files
+https://docs.djangoproject.com/en/1.8/topics/logging/
+* Signals: Use Cases and Avoidance Techniques
+Signals can be useful, but they should be used as a last resort, only when there’s no good way to avoid using them.
+** When to Use and Avoid Signals
+Do not use signals when:
++ The signal relates to one particular model and can be moved into one of that model’s methods, possibly called by save().
++ The signal can be replaced with a custom model manager method.
++ The signal relates to a particular view and can be moved into that view.
+
+It might be okay to use signals when:
++ Your signal receiver needs to make changes to more than one model.
++ You want to dispatch the same signal from multiple apps and have them handled the same way by a common receiver.
++ You want to invalidate a cache after a model save.
++ You have an unusual scenario that needs a callback, and there’s no other way to handle it besides using a signal. For example, you want to trigger something based on the save() or init() of a third-party app’s model. You can’t modify the third-party code and extending it might be impossible, so a signal provides a trigger for a callback.
+** Signal Avoidance Techniques
+*** Using Custom Model Manager Methods Instead of Signals
+Let’s imagine that our site handles user-submitted ice cream-themed events, and each ice cream event goes through an approval process. These events are set with a status of “Unreviewed” upon creation. The problem is that we want our site administrators to get an email for each event submission so they know to review and post things quickly.
+We could have done this with a signal, but unless we put in extra logic in the post save() code, even administrator created events would generate emails.
+
+Use custom model manager instead of signals to solve above.
+EventManager:
+#+begin_src python
+# events/managers.py
+from django.db import models
+
+class EventManager(models.Manager):
+
+    def create_event(self, title, start, end, creator):
+        event = self.model(title=title,
+                            start=start,
+                            end=end,
+                            creator=creator)
+        event.save() 
+        event.notify_admins() 
+        return event
+#+end_src
+Let’s attach it to our model (which comes with a notify admins() method:
+#+begin_src python
+# events/models.py
+from django.conf import settings
+from django.core.mail import mail_admins 
+from django.db import models
+from model_utils.models import TimeStampedModel
+from .managers import EventManager
+
+class Event(TimeStampedModel):
+    STATUS_UNREVIEWED, STATUS_REVIEWED = (0, 1)
+    STATUS_CHOICES = (
+        (STATUS_UNREVIEWED, "Unreviewed"),
+        (STATUS_REVIEWED, "Reviewed"),
+    )
+    title = models.CharField(max_length=100)
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    status = models.IntegerField(choices=STATUS_CHOICES,
+                                    default=STATUS_UNREVIEWED)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL)
+    objects = EventManager()
+
+    def notify_admins(self):
+        # create the subject and message
+        subject = "{user} submitted a new event!".format(
+                                user=self.creator.get_full_name())
+                message = """TITLE: {title}
+        START: {start}
+        END: {end}""".format(title=self.title, start=self.start,
+                                end=self.end)
+
+        # Send to the admins!
+        mail_admins(subject=subject,
+            message=message,
+            fail_silently=False)
+#+end_src
+To generate an event, instead of calling create(), we call a create event() method.
+#+begin_src python
+>>> from django.contrib.auth import get_user_model
+>>> from django.utils import timezone
+>>> from events.models import Event
+>>> user = get_user_model().get(username="audreyr")
+>>> now = timezone.now()
+>>> event = Event.objects.create_event(
+...     title="International Ice Cream Tasting Competition",
+...     start=now,
+...     end=now,
+...     user=user
+... )
+#+end_src
+*** Validate Your Model Elsewhere
+If you’re using a pre save signal to trigger input cleanup for a speci c model, try writing a custom validator for your  eld(s) instead.
+If validating through a ModelForm, try overriding your model’s clean() method instead.
+*** Override Your Model's Save or Delete Method Instead
+If you’re using pre save and post save signals to trigger logic that only applies to one particular model, you might not need those signals. You can often simply move the signal logic into your model’s save() method.
+*** Use a Helper Function Instead of Signals
+We find this approach useful under two conditions:
++ /Refactoring:/ Once we realize that certain bits of code no longer need to be obfuscated as signals and want to refactor, the question of ‘Where do we put the code that was in a signal?’ arises. If it doesn’t belong in a model manager, custom validator, or overloaded model method, where does it belong?
++ /Architecture:/ Sometimes developers use signals because we feel the model has become too heavyweight and we need a place for code. While Fat Models are a nice approach, we admit it’s not much fun to have to parse through a 500 or 2000 line chunk of code.
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8
