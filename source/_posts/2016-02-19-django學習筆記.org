@@ -11,6 +11,7 @@ django學習筆記
 <!--more-->
 #+END_HTML
 
+
 * Layout Django Project
 For Example:
 icecreamratings project/: git repository root
@@ -2651,6 +2652,528 @@ If you’re using pre save and post save signals to trigger logic that only appl
 We find this approach useful under two conditions:
 + /Refactoring:/ Once we realize that certain bits of code no longer need to be obfuscated as signals and want to refactor, the question of ‘Where do we put the code that was in a signal?’ arises. If it doesn’t belong in a model manager, custom validator, or overloaded model method, where does it belong?
 + /Architecture:/ Sometimes developers use signals because we feel the model has become too heavyweight and we need a place for code. While Fat Models are a nice approach, we admit it’s not much fun to have to parse through a 500 or 2000 line chunk of code.
+* Utilities
+** Create a Core App for Your Utilities
+*TIP: Always make the core app a real Django app*
+Our core app would therefore look like:
+#+begin_src sh
+core/
+    __init__.py
+    managers.py # contains the custom model manager(s)
+    models.py
+    views.py  # Contains the custom view mixin(s)
+#+end_src
+** Optimize Apps with Utility Modules
+Synonymous with helpers, these are commonly called *utils.py* and sometimes *helpers.py.*
+*** Trimming Models
+One day we notice that our fat model has reached brobdingnagian proprtions and is over a thousand lines of code.
+We start looking for methods (or properties or classmethods) whose logic can be easily encapsulated in functions stored in  /flavors/utils.py./
+** Django's Own Swiss Army Knife
+Most of the modules in django.utils are designed for internal use and only the following parts can be considered stable and thus backwards compatible
+https://docs.djangoproject.com/en/1.8/ref/utils/
+
+Some useful utils from django:
++ django.contrib.humanize
++ django.utils.decorators.method decorator(decorator)
++ django.utils.decorators.decorator from middleware( middleware)
++ django.utils.encoding.force text(value)
++ django.utils.functional.cached property
++ django.utils.html.format html(format str, args, **kwargs)
++ django.utils.html.strip tags(value)
++ django.utils.six
++ django.utils.text.slugify(value)
++ django.utils.timezone
++ django.utils.translation
+** Exceptions
+https://docs.djangoproject.com/en/dev/ref/exceptions
+*** django.core.exceptions.ImproperlyConfigured
+The purpose of this module is to inform anyone attempting to run Django that there is a con guration issue.
+*** django.core.exceptions.ObjectDoesNotExist
+We’ve found this is a really nice tool for working with utility functions that fetch generic model instances and do something with them. Here is a simple example:
+#+begin_src python
+# core/utils.py
+from django.core.exceptions import ObjectDoesNotExist
+
+class BorkedObject(object): 
+    loaded = False
+
+def generic_load_tool(model, pk): 
+    try:
+        instance = model.objects.get(pk=pk) 
+    except ObjectDoesNotExist:
+        return BorkedObject() 
+    instance.loaded = True 
+    return instance
+#+end_src
+We can create our own variant of django's django.shortcuts.getobjector404 function, perhaps raising a HTTP 403 exception instead of a 404:
+#+begin_src python
+# core/utils.py
+from django.core.exceptions import MultipleObjectsReturned 
+from django.core.exceptions import ObjectDoesNotExist 
+from django.core.exceptions import PermissionDenied
+
+def get_object_or_403(model, **kwargs): .
+    try:
+        return model.objects.get(**kwargs)
+    except ObjectDoesNotExist: 
+        raise PermissionDenied
+    except MultipleObjectsReturned: 
+        raise PermissionDenied
+#+end_src
+*** django.core.exceptions.PermissionDenied
+if something bad happens, instead of just returning a 500 exception, which may rightly alarm users, we simply provide a “Permission Denied” screen.
+#+begin_src python
+# stores/calc.py
+
+def finance_data_adjudication(store, sales, issues):
+    if store.something_not_right: 
+        msg = "Something is not right. Please contact the support team."
+        raise PermissionDenied(msg)
+    # Continue on to perform other logic.
+#+end_src
+#+begin_src python
+# urls.py
+# This demonstrates the use of a custom permission denied view. The default
+# view is django.views.defaults.permission_denied
+handler403 = 'core.views.permission_denied_view'
+#+end_src
+** Serializers and Deserializers
+Django has some great tools for working with serialization and deserialization of data of JSON, Python, YAML and XML data.
+Here is how we serialize data:
+#+begin_src python
+# serializer_example.py
+from django.core.serializers import get_serializer
+from favorites.models import Favorite
+# Get and instantiate the serializer class
+# The 'json' can be replaced with 'python' or 'xml'.
+# If you have pyyaml installed, you can replace it with # 'pyyaml'
+JSONSerializer = get_serializer("json").
+serializer = JSONSerializer()
+
+favs = Favorite.objects.filter()[:5]
+
+# Serialize model data
+serialized_data = serializer.serialize(favs)
+
+# save the serialized data for use in the next example
+with open("data.json", "w") as f:
+    f.write(serialized_data)
+#+end_src
+
+Here is how we deserialize data:
+#+begin_src python
+# deserializer_example.py
+from django.core.serializers import get_serializer
+from favorites.models import Favorite 
+
+favs = Favorite.objects.filter()[:5]
+
+# Get and instantiate the serializer class
+# The 'json' can be replaced with 'python' or 'xml'.
+# If you have pyyaml installed, you can replace it with
+#   'pyyaml'
+JSONSerializer = get_serializer("json")
+serializer = JSONSerializer()
+
+# open the serialized data file
+with open("data.txt") as f:
+    serialized_data = f.read()
+
+# deserialize model data into a generator object
+#   we'll call 'python data'
+python_data = serializer.deserialize(serialized_data)
+
+# iterate through the python_data 
+for element in python_data:
+    # Prints 'django.core.serializers.base.DeserializedObject' 
+    print(type(element))
+
+    # Elements have an 'object' that are literally instantiated 
+    # model instances (in this case, favorites.models.Favorite) 
+    print(element.object.pk, element.object.created)
+#+end_src
+
+using Django’s built-in serializers and deserializers: they can cause problems. From painful experience, we know that they don’t handle complex data structures well.
+Consider these guidelines that we follow in our projects:
++ Serialize data at the simplest level.
++ Any database schema change may invalidate the serialized data.
++ Don’t just import serialized data. Consider using Django’s form libraries to validate incoming data before saving to the database.
+*** django.core.serializers.json.DjangoJSONEncoder
+Python’s built-in JSON module can’t handle encoding of date/time or decimal types.
+Fortunately for all of us, Django provides a very useful JSONEncoder class. See the code example below:
+#+begin_src python
+# json_encoding_example.py 
+import json
+from django.core.serializers.json import DjangoJSONEncoder 
+from django.utils import timezone
+
+data = {"date": timezone.now()}
+
+# If you don't add the DjangoJSONEncoder class then
+# the json library will throw a TypeError.
+json_data = json.dumps(data, cls=DjangoJSONEncoder)
+print(json_data)
+#+end_src
+* Deployment:Platforms as a Service
+The most commonly-used Django-friendly PaaS companies as of this writing are:
++ Heroku (http://heroku.com) is a popular option in the Python community well known for its documentation and add-ons system. If you choose this option, please read http://www.theherokuhackersguide.com/ by Randall Degges.
++ PythonAnywhere (https://www.pythonanywhere.com) is a Python-powered PaaS that is incredibly beginner-friendly.
+** Automate All the Things!
+Use simple automation using one of the following tools:
++ *Makefiles* are useful for simple projects. Their limited capability means we won’t be tempted to make things too fancy. As soon as you need more power, it’s time to use something else. Something like Invoke as described in the next bullet.
++ *Invoke* is the direct descendant of the venerable Fabric library. It is similar to Fabric, but is designed for running tasks locally rather than on a remote server. Tasks are de ned in Python code, which allows for a bit more complexity in task de nitions (although it’s easy to take things too far). It has full support for Python 3.4.
+* Deploying Django Projects
+https://docs.djangoproject.com/en/1.8/howto/deployment/
+** Single-Server for Small Projects
+*** Example: Quick Ubuntu + Gunicorn Setup
++ An old computer or cheap cloud server
++ Ubuntu Server OS
++ PostgreSQL
++ Virtualenv
++ Gunicorn
+You can either use a computer that you have lying around your house, or you can use a cheap cloud server from a provider like DigitalOcean, Rackspace, or AWS.
+installing at least these:
+*For pip/virtualenv* python-pip, python-virtualenv
+*For PostgreSQL* postgresql, postgresql-contrib, libpq-dev, python-dev
+
+Then we do all the server setup basics like updating packages and creating a user account for the project.
+At this point, it’s Django time. We clone the Django project repo into our user’s home directory and create a virtualenv with the project’s Python package dependencies, including Gunicorn. We create a PostgreSQL database for the Django project and run python manage.py migrate.
+Then we run the Django project in Gunicorn. As of this writing, this requires a simple 1-line com- mand. See: https://docs.djangoproject.com/en/1.8/howto/deployment/wsgi/gunicorn/
+adding nginx, Redis, and/or memcached, or setting up Gunicorn behind an nginx proxy.
+** Multi-Server for Medium to Large Projects
+[[{% asset_img figure31_1.png %}]]
+This is what you need at the most basic level:
++ *Database server.* Typically PostgreSQL in our projects when we have the choice, though Eventbrite uses MySQL.
++ *WSGI application server.* Typically uWSGI or Gunicorn with Nginx, or Apache with mod wsgi.
+
+Additionally, we may also want one or more of the following:
++ *Static file server.* If we want to do it ourselves, Nginx or Apache are fast at serving static files. However, CDNs such as Amazon CloudFront are relatively inexpensive at the basic level.
++ *Caching and/or asynchronous message queue server.*  is server might run Redis, Memcached or Varnish.
++ *Miscellaneous server.* If our site performs any CPU-intensive tasks, or if tasks involve waiting for an external service (e.g. the Twitter API) it can be convenient to offload them onto a server separate from your WSGI app server.
+
+Finally, we also need to be able to manage processes on each server. We recommend in descending order of preference:
+1. Supervisord
+2. init scripts
+*** Advanced Multi-Server Setup
+[[{% asset_img figure31_3.png %}]]
+Load balancers can be hardware- or software-based. Commonly-used examples include:
++ Software-based: HAProxy, Varnish, Nginx
++ Hardware-based: Foundry, Juniper, DNS load balancer
++ Cloud-based: Amazon Elastic Load Balancer, Rackspace Cloud Load Balancer
+** WSGI Application Servers
+The most commonly-used WSGI deployment setups are:
+1. uWSGI with Nginx.
+2. Gunicorn behind a Nginx proxy.
+3. Apache with mod wsgi.
+[[{% asset_img table31_1.png %}]]
+** Automated, Repeatable Deployments
+* Continuous Integration 
+Here’s a typical development work ow when using continuous integration:
+1. Developer writes code, runs local tests against it, then pushes the code to an instance of a code repository such as Git or Mercurial. This should happen at least once per day.
+2. The code repository informs an automation tool that code has not been submitted for integration.
+3. Automation integrates the code into the project, building out the project. Any failures during the build process and the commit is rejected.
+4. Automation runs developer-authored tests against the new build. Any failures of the tests and the commit is rejected.
+5. The developer is notified of success or the details of failure. Based on the report, the developer can mitigate the failures. If there are no failures, the developer celebrates and moves to the next task.
+** Principles of Continuous Integration
+*** Write Lots of Tests!
+*** Keeping the Build Fast
++ Avoid fixtures. This is yet another reason why we advise against their use.
++ Avoid TransactionTestCase except when absolutely necessary.
++ Avoid heavyweight setUp() methods.
++ Write small, focused tests that run at lightning speed, plus a few larger integration-style tests.
++ Learn how to optimize your database for testing.  is is discussed in public forums like Stack Overflow: http://stackoverflow.com/a/9407940/93270
+** Tools for Continuously Integrating Your Project
+*** Tox
+http://tox.readthedocs.org/
+This is a generic virtualenv management and testing command-line tool that allows us to test our projects against multiple Python and Django versions with a single command at the shell.
+*** Jenkins
+http://jenkins-ci.org/
+Jenkins is a extensible continuous integration engine used in private and open source efforts around the world. It is the standard for automating the components of Continuous Integration, with a huge community and ecosystem around the tool.
+** Continuous Integration as a Service
+There are various services that provide automation tools powered by Jenkins or analogues. Some of these plug right into popular repo hosting sites like GitHub and BitBucket, and most provide free repos for open source projects. Some of our favorites include:
+| Service            | Python Versions Supported           | Link                     |
+|--------------------+-------------------------------------+--------------------------|
+| Travis-CI          | 3.3, 3.2, 2.7, 2.6, PyPy            | https://travis-ci.org    |
+| AppVeyor (Windows) | 3.4, 3.3, 2.7                       | http://www.appveyor.com/ |
+| CircleCI           | 3.4, 3.3, 2.7, 2.6, PyPy, many more | https://circleci.com     |
+| Drone.io           | 2.7, 3.3                            | https://drone.io/        |
+| Codeship           | 3.4, 2.7                            | https://codeship.com     |
+*** Code Coverage as a Service
+https://codecov.io can generate coverage reports
+* Debugging
+** Debugging in Development
+*** Use django-debug-toolbar
+If you don’t have it set up and con gured, stop everything else you are doing and add it to your project.
++ https://pypi.python.org/pypi/django-debug-toolbar 
++ http://django-debug-toolbar.readthedocs.org
+
+*** That Annoying CBV Error
+#+begin_src python
+twoscoopspress$ python discounts/manage.py runserver 8001 
+Starting development server at http://127.0.0.1:8001/ 
+Quit the server with CONTROL-C.
+
+Internal Server Error: /
+Traceback (most recent call last):
+File "/Users/python/lib/python2.7/site-packages/django/core/handlers/base.py",
+        line 132, in get_response response = wrapped_callback(request,
+        *callback_args, **callback_kwargs)
+File "/Users/python/lib/python2.7/site-packages/django/utils/decorators.py",
+        line 145, in inner
+    return func(*args, **kwargs)
+TypeError: __init__() takes exactly 1 argument (2 given)
+#+end_src
+This error is caused because lack as_view() at urls.py
+Example of TypeError generating code:
+#+begin_src python
+# Forgetting the 'as_view()' method 
+url(r'ˆ$', HomePageView, name="home"),
+#+end_src
+Example of fixed code:
+#+begin_src python
+url(r'ˆ$', HomePageView.as_view(), name="home"),
+#+end_src
+*** Master the Python Debugger
+ipdb(ipdb does is add the ipython interface to the PDB interface) is also very useful
+References:
++ Python’s pdb documentation: https://docs.python.org/2/library/pdb.html
++ IPDB: https://pypi.python.org/pypi/ipdb
++ Using PDB with Django: https://mike.tig.as/blog/2010/09/14/pdb/
+
+*** Remember the Essentials for Form File Uploads
+There are two easily forgotten items that will cause file uploads to fail silently.
+check the following:
+
+1. Does the <form> tag include an encoding type?
+{% raw %}
+#+begin_src python
+<form action="{% url 'stores:file_upload' store.pk %}"
+        method="post"
+        enctype="multipart/form-data">
+#+end_src
+{% endraw %}
+
+2. Do the views handle request.FILES? In Function-Based Views?
+#+begin_src python
+# stores/views.py
+from django.shortcuts import render, redirect, get_object_or_404 
+from django.views.generic import View
+from stores.forms import UploadFileForm 
+from stores.models import Store
+
+def upload_file(request, pk):
+    """Simple FBV example"""
+    store = get_object_or_404(Store, pk=pk) 
+    if request.method == 'POST':
+        # Don't forget to add request.FILES!
+        form = UploadFileForm(request.POST, request.FILES) 
+        if form.is_valid():
+            store.handle_uploaded_file(request.FILES['file']) 
+            return redirect(store)
+    else:
+        form = UploadFileForm()
+    return render(request, 'upload.html', {'form': form, 'store': store})
+#+end_src
+Or what about Class-Based Views?
+#+begin_src python
+# stores/views.py
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.generic import View
+from stores.forms import UploadFileForm 
+from stores.models import Store
+
+class UploadFile(View): 
+    """Simple CBV example""" 
+    def get_object(self):
+        return get_object_or_404(Store, pk=self.kwargs['pk'])
+
+def post(self, request, *args, **kwargs):
+    store = self.get_object() .
+    form = UploadFileForm(request.POST, request.FILES) 
+    if form.is_valid():
+        store.handle_uploaded_file(request.FILES['file'])
+        return redirect(store)
+    return redirect('stores:file_upload', pk=pk)
+
+def get(self, request, *args, **kwargs):
+    store = self.get_object()
+    form = UploadFileForm()
+    return render(request, 'upload.html', {'form': form, 'store': store})
+#+end_src
+
+If a view inherits from one of the following then we don’t need to worry about re- quest.FILES in your view code. Django handles most of the work involved.
++ django.views.generic.edit.FormMixin
++ django.views.generic.edit.FormView
++ django.views.generic.edit.CreateView
++ django.views.generic.edit.UpdateView
+** Debugging Production Systems
+*** Read the Logs the Easy Way
+use a log aggregator like Sentry get a better view into what is going on in your application.
+*** Mirroring Production
+*** UserBasedExceptionMiddleware
+What if you could provide superusers with access to the settings.DEBUG=True 500 error page in production?
+there is a way to use this powerful debugging tool in production.
+#+begin_src python
+# core/middleware.py
+import sys
+from django.views.debug import technical_500_response
+
+class UserBasedExceptionMiddleware(object):
+    def process_exception(self, request, exception):
+        if request.user.is_superuser:
+            return technical_500_response(request, *sys.exc_info())
+#+end_src
+*** That Troublesome settings.ALLOWED HOSTS Error
+Unfortunately, as soon as settings.DEBUG is False, a project with an incorrectly set ALLOWED_HOSTS will generate constant 500 errors. Checking the logs will show that SuspiciousOperation errors are being raised, but those errors don’t come with a meaningful message.
+
+Therefore, whenever a project is deployed for the first time and always returns a 500 error, check settings.ALLOWED HOSTS. As for knowing what to set, here is a starting example:
+#+begin_src python
+# settings.py
+ALLOWED_HOSTS = [
+    '.djangopackages.com',
+    'localhost',  # Ensures we can run DEBUG = False locally
+    '127.0.0.1'  # Ensures we can run DEBUG = False locally
+]
+#+end_src
+** Feature Flags
+*Feature Flags* allow us to turn a project’s feature on or off via a web-based interface.
+What if we could allow a subset of real users (i.e. ‘beta users’) defined through an admin-style interface to interact with a new feature before turning it on for everyone?
+This is what feature  ags are all about!
+*** Feature Flag Packages
++ https://github.com/disqus/gargoyle
++ https://github.com/jsocol/django-waffle
+*** Unit Testing Code Affected by Feature Flags
+One gotcha with feature  ags is running tests against code that are turned off by them. How do we know that our new feature is tested when the flag to run them is turned off?
+The answer to this question is that our tests should cover both code paths, with feature flags on or off. To do this, we need to familiarize ourselves with how to turn a feature  ag on or off within the Django testing framework:
++ http://gargoyle.readthedocs.org/en/latest/usage/index.html#testing-switches
++ http://waffle.readthedocs.org/en/latest/testing/automated.html#testing-automated
+* Internationalization and Localization
+** Define Python Source Code Encodings
+at the top each module add:
+#+begin_src python
+# -*- coding: utf-8 -*-
+#+end_src
+** Wrap Content Strings with Translation Functions
+https://docs.djangoproject.com/en/1.8/topics/i18n/translation/
+| Function        | Purpose                                                                   | Link                                                                                        |
+|-----------------+---------------------------------------------------------------------------+---------------------------------------------------------------------------------------------|
+| ugettext()      | For content executed at runtime, e.g. form validation errors.             | https://docs.djangoproject.com/en/1.8/topics/i18n/translation/#standard-translation         |
+| ugettext lazy() | For content executed at compile time, e.g. verbose name in models.        | https://docs.djangoproject.com/en/1.8/topics/i18n/translation/#lazy-translation             |
+| string concat() | Replaces the standard str.join() method for joining strings. Rarely used. | https://docs.djangoproject.com/en/1.8/topics/i18n/translation/#localized-names-of-languages |
+*** Convention: Use the Underscore Alias to Save Typing
+#+begin_src python
+# -*- coding: utf-8 -*-
+from django.utils.translation import ugettext as _
+
+print(_("We like gelato."))
+#+end_src
+** Don't Interpolate Words in Sentences
+Bad Example:
+#+begin_src python
+# DON'T DO THIS!
+
+# Skipping the rest of imports for the sake of brevity
+class FlavorActionMixin(object):
+
+    @property
+    def action(self):
+        msg = "{0} is missing action.".format(self.__class__)
+        raise NotImplementedError(msg)
+
+    def form_valid(self, form):
+        msg = "Flavor {0}!".format(self.action) 
+        messages.info(self.request, msg)
+        return super(FlavorActionMixin, self).form_valid(form)
+# Snipping the rest of this module for the sake of brevity
+#+end_src
+want to change above to international string but it does not works:
+#+begin_src python
+# DON'T DO THIS!
+from django.utils.translations import ugettext as _
+
+# Skipping the rest of this module for the sake of brevity 
+def form_valid(self, form):
+    # This generates a useless translation object.
+    msg = _("Flavor {0}!".format(self.action)) messages.info(self.request, msg)
+    return super(FlavorActionMixin, self).form_valid(form)
+# Skipping the rest of this module for the sake of brevity
+#+end_src
+
+improve above:
+#+begin_src python
+# -*- coding: utf-8 -*-
+# Skipping the rest of imports for the sake of brevity from django.utils.translation import ugettext as _
+
+class FlavorActionMixin(object):
+    @property
+    def success_msg(self): .
+        return NotImplemented
+
+class FlavorCreateView(LoginRequiredMixin, FlavorActionMixin, CreateView):
+    model = Flavor
+    # Slightly longer but more meaningful dialogue
+    success_msg = _("Flavor created!")
+#+end_src
+** Unicode Tricks
++ Python 3 Can Make Unicode Easier
++ Use django.utils.encoding.force text() Instead of unicode() or str()
+** Browser Page Layout
+Assuming you’ve got your content and Django templates internationalized and localized, you can discover that your layouts are broken.
+Mozilla’s answer is to determine the width of a title container, then use JavaScript adjust the font size of the title text downwards until the text fits into the container with wrapping.
+* Security Settings Reference
+| Setting                               | Development           | Production            |
+|---------------------------------------+-----------------------+-----------------------|
+| ALLOWED_HOSTS                         | any list              | [[That Troublesome settings.ALLOWED HOSTS Error][see previous chapter]]  |
+| DEBUG                                 | True                  | False                 |
+| DEBUG_PROPAGATE_EXCEPTIONS            | False                 | False                 |
+| Email SSL                             | see below             | see below             |
+| MIDDLEWARE_CLASSES                    | Standard              | AddSecurityMiddleware |
+| SECRET_KEY                            | Use cryptographic key | [[重要的secret key問題(secret key不該進入version control)][see previous chapter]]  |
+| SECURE_PROXY_SSL_HEADER               | None                  | see below             |
+| SECURE_SSL_HOST                       | False                 | True                  |
+| SESSION_COOKIE_SECURE                 | False                 | True                  |
+| SESSION SERIALIZER                    | see below             | see below             |
+** Email SSL
+https://docs.djangoproject.com/en/1.8/ref/settings/#email-use-tls
++ EMAIL_USE_TLS
++ EMAIL_USE_SSL
++ EMAIL_SSL_CERTFILE 
++ EMAIL_SSL_KEYFILE
+** SESSION SERIALIZER
+SESSION SERIALIZER = django.contrib.sessions.serializers.JSONSerializer.
+** SECURE PROXY SSL HEADER
+For some setups, most notably Heroku, this should be:
+SECURE PROXY SSL HEADER = (`HTTP X FORWARDED PROTO', `https')
+* Some Useful Packages
+** Core
++ django-debug-toolbar http://django-debug-toolbar.readthedocs.org/ Display panels used for debugging Django HTML views.
++ ipdb https://pypi.python.org/pypi/ipdb IPython-enabled pdb
++ Sphinx http://sphinx-doc.org/ Documentation tool for Python projects.
+** Asynchronous
++ celery http://www.celeryproject.org/ Distributed task queue.
++ django-rq https://pypi.python.org/pypi/django-rq A simple app that provides django integration for RQ (Redis Queue).
++ django-background-tasks https://pypi.python.org/pypi/django-background-tasks Database backed asynchronous task queue.
+** Deployment
++ Invoke https://pypi.python.org/pypi/invoke Like Fabric, also works in Python 3.
++ Supervisor http://supervisord.org/ Supervisord is a client/server system that allows its users to monitor and control a number of processes on UNIX-like operating systems.
+** Logging
++ Sentry http://getsentry.com Exceptional error aggregation, with an open source code base.
+** Project Templates
++ cookiecutter-django https://github.com/pydanny/cookiecutter-django The sample project layout detailed in chapter 3 of this book.
++ Cookiecutter http://cookiecutter.readthedocs.org Not explicitly for Django, a command-line utility for creating project and app templates. It’s focused, heavily tested and well documented. By one of the authors of this book.
+** REST APIs
++ django-rest-framework http://django-rest-framework.org/ The defacto REST package for Django. Exposes model and non-model resources as a RESTful API.
+
+** Testing
++ coverage http://coverage.readthedocs.org/ Checks how much of your code is covered with tests.
++ mock https://pypi.python.org/pypi/mock Not explicitly for Django, this allows you to replace parts of your system with mock objects. This project made its way into the standard library as of Python 3.4.
++ tox http://tox.readthedocs.org/ A generic virtualenv management and test command line tool that allows testing of projects against multiple Python version with a single command at the shell.
+** Views
++ django-braces http://django-braces.readthedocs.org Drop-in mixins that really empower Django’s class-based views.
+
+** Feature Flag
+https://github.com/disqus/gargoyle
+https://github.com/jsocol/django-waffle
 * Reference
 此筆記大多來自這本書：
 Two Scoops of Django: Best Practices for Django 1.8

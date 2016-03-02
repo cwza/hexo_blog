@@ -19,6 +19,7 @@ spc t g #toggle golden ratio
 spc y #avy goto line
 spc spc #avy goto word
 spc S #auto Spelling
+spc r y #show kill ring
 #+end_src
 ** dired
 #+begin_src sh
