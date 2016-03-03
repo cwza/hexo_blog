@@ -1,0 +1,28 @@
+#+TITLE: freenode irc 指令筆記
+#+DATE: <2016-03-03 Thu 14:19> 
+#+TAGS: irc, freenode, emacs, spacemacs
+#+LAYOUT: post
+#+CATEGORIES: editor
+#+OPTIONS: toc:t \n:t ^:{}
+
+
+* rcirc設定 with emacs
+#+begin_src lisp
+  (setq rcirc-server-alist
+        '(("irc.freenode.net"
+           :nick "nickname"
+           :port "6667"
+           :password "password"
+           :channels ("#django"))))
+#+end_src
+* Register your nickname
+#+begin_src sh
+/nick YourNewNickname
+/msg nickserv register YourPassword you@example.com
+#+end_src
+* 指令
+#+begin_src sh
+/join #channelname -- to join a channel
+/part -- to leave one channel
+/quit to leave IRC altogether. This disconnects mirc from the server.
+#+end_src
