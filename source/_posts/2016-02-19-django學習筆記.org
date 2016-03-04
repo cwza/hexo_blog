@@ -11,6 +11,14 @@ django學習筆記
 <!--more-->
 #+END_HTML
 
+* Coding Style
+** Use Explicit Relative Imports
+here’s a table of the different Python import types and when to use them in Django projects:
+| Code                             | Import Type       | Usage                                                                                 |
+|----------------------------------+-------------------+---------------------------------------------------------------------------------------|
+| from core.views import FoodMixin | absolute import   | Use when importing from outside the current app                                       |
+| from .models import WaffleCone   | explicit relative | Use when importing from another module in the current app                             |
+| from models import WaffleCone    | implicit relative | Often used when importing from another module in the current app, but not a good idea |
 
 * Layout Django Project
 For Example:
