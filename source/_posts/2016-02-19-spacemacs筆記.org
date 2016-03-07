@@ -35,3 +35,13 @@ spc g s #git status
 
 C-c C-c #commit訊息編輯完後save
 #+end_src
+** neotree
+#+begin_src sh
+spc f t #open newtree
+spc p t #open neotree with project root
+spc 0 #cursor to neotree
+gr #refresh
+r #rename a node
+c #create a node
+d #delete a node
+#+end_src
