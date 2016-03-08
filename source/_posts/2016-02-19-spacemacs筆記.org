@@ -45,3 +45,11 @@ r #rename a node
 c #create a node
 d #delete a node
 #+end_src
+** evil fold
+#+begin_src sh
+z o #evil open fold
+z c #evil close fold
+z r #evil open folds
+z m #evil open folds
+z a #evil toggle fold
+#+end_src
