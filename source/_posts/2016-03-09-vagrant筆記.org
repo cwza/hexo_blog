@@ -1,0 +1,36 @@
+#+TITLE: vagrant筆記
+#+DATE: <2016-03-09 Wed 18:40>   
+#+TAGS: vagrant, linux, vmware, virtualbox
+#+LAYOUT: post
+#+CATEGORIES: linux
+#+OPTIONS: toc:nil \n:t
+
+vagrant筆記
+[[https://www.vagrantup.com/][Vagrant Official Site]]
+[[https://atlas.hashicorp.com/boxes/search][Place Where You Can Download Predefined Box]]
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Uninstall
+** REMOVING THE VAGRANT PROGRAM
+#+begin_src sh
+rm -rf /Applications/Vagrant
+rm -f /usr/bin/vagrant
+sudo pkgutil --forget com.vagrant.vagrant
+#+end_src
+** REMOVING USER DATA
+#+begin_src sh
+rm -rf  ~/.vagrant.d
+#+end_src
+* Command
+#+begin_src sh
+vagrant init #create Vagrantfile in current folder
+vagrant box add hashicorp/precise64 #add a box
+vagrant up #creates and configures guest machines according to your Vagrantfile
+vagrant ssh
+vagrant destroy #shutdown and clear and destroy this box
+vagrant halt #shutdown
+vagrant halt -f #force shutdown that means to turn off the power
+#+end_src

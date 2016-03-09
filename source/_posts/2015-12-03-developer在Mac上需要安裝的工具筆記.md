@@ -41,9 +41,18 @@ https://github.com/syl20bnr/spacemacs
 brew install tig
 ```
 
+### tree
+``` bash
+brew install tree
+```
+
 ### dash
 API Documents Browser
 https://kapeli.com/dash
+
+### vagrant
+command line manage tool for VM
+https://www.vagrantup.com
 
 -------------------------------------------------------------------------------
 
@@ -93,6 +102,9 @@ brew install node
 brew install nvm
 ```
 [nvm 指令筆記](/2015/12/03/nvm指令筆記/)
+
+-------------------------------------------------------------------------------
+
 
 -------------------------------------------------------------------------------
 
