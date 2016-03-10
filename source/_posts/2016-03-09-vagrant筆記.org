@@ -3,16 +3,24 @@
 #+TAGS: vagrant, linux, vmware, virtualbox
 #+LAYOUT: post
 #+CATEGORIES: linux
-#+OPTIONS: toc:nil \n:t
+#+OPTIONS: toc:t \n:t
 
 vagrant筆記
 [[https://www.vagrantup.com/][Vagrant Official Site]]
-[[https://atlas.hashicorp.com/boxes/search][Place Where You Can Download Predefined Box]]
+[[https://atlas.hashicorp.com/boxes/search][Place Where You Can Download And Upload Box]]
 
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
 
+* General
+** Path
+下載的box預設放在~/.vagrant.d/boxes裡
+guest machine的data放的地方根據VM設定而不同可開啟VirtualBox查看，VirtualBox預設是在~/VirtualBox\ VMS
+** Shared Folder
+guest machine的/vagrant將會自動mount到host machine的放Vagrantfile的那個folder
+此功能需要guest machine的Box的VB guest additions版本與VM中的一樣
+若出現錯誤則需要更新box或用這個非官方的plugin: https://github.com/dotless-de/vagrant-vbguest
 * Uninstall
 ** REMOVING THE VAGRANT PROGRAM
 #+begin_src sh
@@ -25,12 +33,67 @@ sudo pkgutil --forget com.vagrant.vagrant
 rm -rf  ~/.vagrant.d
 #+end_src
 * Command
+https://www.vagrantup.com/docs/cli/
 #+begin_src sh
+
 vagrant init #create Vagrantfile in current folder
-vagrant box add hashicorp/precise64 #add a box
+vagrant box add USER/BOX #add a box from https://atlas.hashicorp.com/boxes/search
 vagrant up #creates and configures guest machines according to your Vagrantfile
-vagrant ssh
-vagrant destroy #shutdown and clear and destroy this box
-vagrant halt #shutdown
-vagrant halt -f #force shutdown that means to turn off the power
+vagrant ssh #SSH into a running Vagrant machine and give you access to a shell
+vagrant up --provider=vmware_fusion #indicate the provider
+
+vagrant destroy #stops the running machine Vagrant is managing and destroys all resources that were created during the machine creation process.
+vagrant halt #shutdown the running machine
+vagrant box remove NAME --all #remove box
+vagrant halt -f #force shutdown running maching that means to turn off the power
+vagrant suspend #save the current running state of the machine and stop it
+
+vagrant reload # == halt and up, use it after Vagrantfile modification
+vagrant reload --provision #provision does not run again by default, this command force run provision
 #+end_src
+** halt vs destory vs box remove
+vagrant halt: 將machine關機
+vagrant destroy: 將machine關機，且將該machine移除，但box還留著
+vagrant box remove: 移除box
+* Provision
+example: 安裝apache server and 將DocumentRoot指向/vagrant when provision
+bootstrap.sh
+#+begin_src sh
+#!/usr/bin/env bash
+
+apt-get update
+apt-get install -y apache2
+if ! [ -L /var/www ]; then
+  rm -rf /var/www
+  ln -fs /vagrant /var/www
+fi
+#+end_src
+
+Vagrantfile
+#+begin_src sh
+Vagrant.configure("2") do |config|
+  config.vm.box = "hashicorp/precise64"
+  config.vm.provision :shell, path: "bootstrap.sh"
+end
+#+end_src
+
+記得run vagrant reload --provision
+* Network
+** Port Forwarding
+#+begin_src ruby
+Vagrant.configure("2") do |config|
+  config.vm.box = "hashicorp/precise64"
+  config.vm.provision :shell, path: "bootstrap.sh"
+  config.vm.network :forwarded_port, guest: 80, host: 4567
+end
+#+end_src
+then run vagrant reload
+** Private Network
+#+begin_src ruby
+Vagrant.configure("2") do |config|
+  config.vm.network "private_network", type: "dhcp"
+end
+#+end_src
+* Box
+** Create A Base Box
+https://www.vagrantup.com/docs/virtualbox/boxes.html

@@ -1,0 +1,37 @@
+#+TITLE: Upstart 筆記
+#+DATE: <2016-03-10 Thu 18:27>   
+#+TAGS: linux
+#+LAYOUT: post
+#+CATEGORIES: linux
+#+OPTIONS: toc:t \n:t ^:{}
+
+
+傳統init.d的取代方案，比init.d好寫很多
+http://upstart.ubuntu.com/index.html
+
+* Example
+開機時(有網路連接狀態)自動啟動Gunicorn，Crash時自動重啟，關機時關閉
+將以下檔案放到/etc/init/gunicorn-superlists-staging.ottg.eu.conf
+#+begin_src sh
+description "Gunicorn server for superlists-staging.ottg.eu"
+
+start on net-device-up #start after net OK
+stop on shutdown
+
+respawn #restart if crash
+
+setuid elspeth #user
+chdir /home/elspeth/sites/superlists-staging.ottg.eu/source #working directory
+
+#execute command
+exec ../virtualenv/bin/gunicorn \
+    --bind unix:/tmp/superlists-staging.ottg.eu.socket \
+    superlists.wsgi:application
+#+end_src
+
+* Command
+#+begin_src sh
+sudo start gunicorn-superlists-staging.ottg.eu
+sudo stop gunicorn-superlists-staging.ottg.eu
+sudo restart gunicorn-superlists-staging.ottg.eu
+#+end_src
