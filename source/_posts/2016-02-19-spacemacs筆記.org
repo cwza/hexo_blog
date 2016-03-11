@@ -12,14 +12,21 @@ spacemacs筆記
 #+END_HTML
 * 指令筆記
 #+begin_src sh
+spc h spc #help docs
+spc : #excute emacs function
+spc t g #toggle golden ratio
+spc y #avy goto line
+spc spc CHR #avy goto word
+spc S #auto Spelling
+spc r y #show kill ring
+#+end_src
+** helm
+#+begin_src sh
 spc f e d #find .spacemacs 
 spc f r #find recent file
 spc f f #find file
-spc t g #toggle golden ratio
-spc y #avy goto line
-spc spc #avy goto word
-spc S #auto Spelling
-spc r y #show kill ring
+spc p f #find file in project
+spc p I #remove project file find cache
 #+end_src
 ** dired
 #+begin_src sh
