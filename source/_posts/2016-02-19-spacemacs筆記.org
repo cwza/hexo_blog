@@ -77,4 +77,6 @@ spc s f # search at current folder or file
 
 spc n f -> :%s/aaa/bbb/g # narrow to function and do vim style replace
 spc n w # return from narrow
+
+spc s p -> C-c C-e # after search enter C-c C-e into helm-edit that can do cross file replacement
 #+end_src
