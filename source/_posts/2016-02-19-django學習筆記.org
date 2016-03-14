@@ -3164,6 +3164,9 @@ SECURE PROXY SSL HEADER = (`HTTP X FORWARDED PROTO', `https')
 ** Deployment
 + Invoke https://pypi.python.org/pypi/invoke Like Fabric, also works in Python 3.
 + Supervisor http://supervisord.org/ Supervisord is a client/server system that allows its users to monitor and control a number of processes on UNIX-like operating systems.
+** Forms
++ django-crispy-forms http://django-crispy-forms.readthedocs.org/ Rendering controls for Django forms. Uses Twitter Bootstrap widgets by default, but skinnable.
++ django- oppyforms http://django-floppyforms.readthedocs.org/ Form field, widget, and layout that can work with django-crispy-forms.
 ** Logging
 + Sentry http://getsentry.com Exceptional error aggregation, with an open source code base.
 ** Project Templates

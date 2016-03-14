@@ -20,20 +20,26 @@ spc spc CHR #avy goto word
 spc S #auto Spelling
 spc r y #show kill ring
 #+end_src
-** helm
+** helm and project
 #+begin_src sh
 spc f e d #find .spacemacs 
 spc f r #find recent file
 spc f f #find file
 spc p f #find file in project
 spc p I #remove project file find cache
+spc p p #switch project
+spc b f # open in finder(OSX)
 #+end_src
 ** dired
 #+begin_src sh
 spc f j #goto dired
 
+R # rename
+C # copy
 + #create folder
 C-x C-f #create new file
+d # mark as deleted
+x # excute marked command
 g #reload
 #+end_src
 ** magit
@@ -59,4 +65,16 @@ z c #evil close fold
 z r #evil open folds
 z m #evil open folds
 z a #evil toggle fold
+#+end_src
+** Searching and replace
+#+begin_src sh
+spc s p # project search
+spc s l # focus the last converted search buffer
+spc s s # helm current file search
+spc s f # search at current folder or file
+ * -> e -> S # search symbol and replace all buffer
+ * -> e -> F -> S # search symbol and replace def block
+
+spc n f -> :%s/aaa/bbb/g # narrow to function and do vim style replace
+spc n w # return from narrow
 #+end_src

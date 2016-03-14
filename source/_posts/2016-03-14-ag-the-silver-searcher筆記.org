@@ -1,0 +1,35 @@
+#+TITLE: Ag The Silver Searcher 筆記
+#+DATE: <2016-03-14 Mon 16:35>   
+#+TAGS: linux, search, ag
+#+LAYOUT: post
+#+CATEGORIES: linux
+#+OPTIONS: toc:t \n:t ^:{}
+
+Ag: A code searching tool similar to ack, with a focus on speed.
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Install
+#+begin_src sh
+brew install ag
+#+end_src
+* Command
+#+begin_src sh
+ag DHH # search "DHH"
+ag DHH guides/ # search "DHH" at path guides/
+ag readme$ # search string is always the regular expression pattern
+ag -Q .rb railties/CHANGELOG.md # use -Q to search exactly the string not regular expression
+ag DHH -l # only output file path that contains search string
+ag readme -i # case insensitive
+ag readme -G ec$ # scoping to file name that end with "ec"
+ag readme -l --ignore-dir="*.rb" # ignore all directory that end with .rb
+ps -e | ag forego # search from ps output
+#+end_src
+* .agignore File
+The .agignore file specifies ignore paths for Ag, and works independently of any VCS file.
+#+begin_src sh
+railties/lib
+guides/code
+#+end_src
