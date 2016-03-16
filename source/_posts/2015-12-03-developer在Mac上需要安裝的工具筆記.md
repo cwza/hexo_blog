@@ -46,6 +46,12 @@ brew install tig
 brew install tree
 ```
 
+### direnv
+``` bash
+brew install direnv
+```
+[direnv筆記](/2016/03/16/direnv筆記/)
+
 ### dash
 API Documents Browser
 https://kapeli.com/dash

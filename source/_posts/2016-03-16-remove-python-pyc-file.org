@@ -1,0 +1,79 @@
+#+TITLE: Remove Python pyc File
+#+DATE: <2016-03-16 Wed 12:08>   
+#+TAGS: python, git
+#+LAYOUT: post
+#+CATEGORIES: python
+#+OPTIONS: toc:t \n:t ^:{}
+
+Python interpreter在執行的時候會在每個package底下產生__pycache__ folder and *.pyc, *.pyo file
+一般而言這些file不會進入版本控管所以在.gitigore中通常會有*.py[co], __pycache__
+但以上設定卻會在git branch switch時導致pyc, pyo殘留問題
+以下介紹3種方法來處理
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Bash Command
+手動執行以下指令
+recursively removes all .pyc files and __pycache__ directories in the current directory
+#+begin_src sh
+find . | grep -E "(__pycache__|\.pyc$)" | xargs rm -rf
+#+end_src
+* Git post-checkout hook
+git post-checkout hook能設定在git branch switch後自動執行的指令
+只要將需要執行的程式放到repo/.git/hooks/post-checkout並設定權限為可執行即可
+github討論: 
+http://stackoverflow.com/questions/1504724/automatically-remove-pyc-files-and-otherwise-empty-directories-when-i-check-ou
+
+以下是google找來的auto remove pyc and empty folder after git checkout範例
+#+begin_src sh
+#!/usr/bin/env bash
+
+# Delete .pyc files and empty directories from root of project
+cd ./$(git rev-parse --show-cdup)
+
+# Clean-up
+find . -name ".DS_Store" -delete
+
+NUM_PYC_FILES=$( find . -name "*.pyc" | wc -l | tr -d ' ' )
+if [ $NUM_PYC_FILES -gt 0 ]; then
+    find . -name "*.pyc" -delete
+    printf "\e[00;31mDeleted $NUM_PYC_FILES .pyc files\e[00m\n"
+fi
+
+NUM_EMPTY_DIRS=$( find . -type d -empty | wc -l | tr -d ' ' )
+if [ $NUM_EMPTY_DIRS -gt 0 ]; then
+    find . -type d -empty -delete
+    printf "\e[00;31mDeleted $NUM_EMPTY_DIRS empty directories\e[00m\n"
+fi
+#+end_src
+* Python Environment Variable PYTHONDONTWRITEBYTECODE
+環境變數中設定PYTHONDONTWRITEBYTECODE=1，可完全禁止python interpreter產生類似檔案
+在developer的環境下十分好用
+以下3種設定環境變數的方法
+** set it at .bash_profile(global)
+在.bash_profile中加入export PYTHONDONTWRITEBYTECODE=1
+最簡單的設定方式，但將導致系統內建的python也無法產生byte code
+** set it at activate and remove it at deactivate by VirtualEnv
+在VirtualEnv中設定，如此即可做到只有該Virtual Env會被影響到
+bin/activate:
+#+begin_src sh
+# Tell Python not to write out .pyc files.
+_OLD_PYTHONDONTWRITEBYTECODE="$PYTHONDONTWRITEBYTECODE"
+PYTHONDONTWRITEBYTECODE=1
+export PYTHONDONTWRITEBYTECODE
+#+end_src
+
+bin/deactivate:
+#+begin_src sh
+PYTHONDONTWRITEBYTECODE="$_OLD_PYTHONDONTWRITEBYTECODE"
+export PYTHONDONTWRITEBYTECODE
+unset _OLD_PYTHONDONTWRITEBYTECODE
+#+end_src
+** use direnv to set
+若python環境是用pyenv + pyenv-virtualenv來管理的話，則需要用到其他tool才能設定環境變數
+因為pyenv不會去執行virtualenv的activate與deactivate，且目前並沒有辦法可以在pyenv中設定環境變數
+by pyenv author: https://github.com/yyuu/pyenv-virtualenv/issues/55
+
+direnv使用方式可參考: direnv筆記

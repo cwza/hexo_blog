@@ -1,0 +1,35 @@
+#+TITLE: direnv筆記
+#+DATE: <2016-03-16 Wed 12:50>   
+#+TAGS: linux, mac
+#+LAYOUT: post
+#+CATEGORIES: linux
+#+OPTIONS: toc:t \n:t ^:{}
+
+direnv可用來設定Project的environment variable
+當cd進project目錄時自動設定環境變數，離開時自動unload
+非常好用
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+https://github.com/direnv/direnv
+* Install
+for mac:
+#+begin_src sh
+brew install direnv
+#+end_src
+
+add following to .bash_profile:
+#+begin_src sh
+eval "$(direnv hook bash)"
+#+end_src
+* Usage
+Add .envrc file at Project root directory
+#+begin_src sh
+export PYTHONDONTWRITEBYTECODE=1
+export env=dev
+#+end_src
+run =direnv allow .=
+* emacs plugin
+https://github.com/christianromney/projectile-direnv

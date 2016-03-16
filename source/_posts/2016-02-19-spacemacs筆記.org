@@ -47,6 +47,8 @@ g #reload
 spc g s #git status
 
 C-c C-c #commit訊息編輯完後save
+
+g # refresh all buffer. This is very useful when git branch changing
 #+end_src
 ** neotree
 #+begin_src sh
