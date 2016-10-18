@@ -1,6 +1,6 @@
 #+TITLE: Upstart 筆記
 #+DATE: <2016-03-10 Thu 18:27>   
-#+TAGS: linux
+#+TAGS: linux, gunicorn
 #+LAYOUT: post
 #+CATEGORIES: linux
 #+OPTIONS: toc:t \n:t ^:{}
@@ -26,6 +26,8 @@ chdir /home/elspeth/sites/superlists-staging.ottg.eu/source #working directory
 #execute command
 exec ../virtualenv/bin/gunicorn \
     --bind unix:/tmp/superlists-staging.ottg.eu.socket \
+    --access-logfile ../access.log \
+    --error-logfile ../error.log \
     superlists.wsgi:application
 #+end_src
 

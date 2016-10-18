@@ -40,7 +40,7 @@ future: true
 highlight:
   enable: true
   line_number: true
-  auto_detect: true
+  auto_detect: false
   tab_replace:
 
 # Category & Tag
@@ -69,7 +69,7 @@ theme: tranquilpeak
 ## Docs: http://hexo.io/docs/deployment.html
 deploy:
   type: git
-  repo: https://github.com/cwza/cwza.github.io.git
+  repo: https://github.com/cwza/my_blog.git
   branch: master
 
 # Sitemap
@@ -90,6 +90,3 @@ org:
   common: |
         #+OPTIONS: toc:nil
         #+BIND: org-html-postamble \"Last Updated %C.</br>Render by <a href='https://github.com/CodeFalling/hexo-renderer-org'>hexo-renderer-org</a> with %c\"
-highlight:
-  enable: true
-  number: true

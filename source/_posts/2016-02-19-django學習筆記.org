@@ -2258,7 +2258,6 @@ http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
 here is a quick primer of some very useful commands you should learn:
 #+begin_src sh
 Section Header
-==============
 
 **emphasis (bold/strong)**
 
@@ -2270,7 +2269,6 @@ Fancier Link: `Two Scoops of Django`_
 .. _Two Scoops of Django: https://django.2scoops.org
 
 Subsection Header
------------------
 
 #) An enumerated list item
 
