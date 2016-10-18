@@ -12,8 +12,8 @@ timezone: Asia/Taipei
 
 # URL
 ## If your site is put in a subdirectory, set url as 'http://yoursite.com/child' and root as '/child/'
-url: http://cwza.github.io/
-root: /
+url: http://cwza.github.io/my_blog
+root: /my_blog/
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 
