@@ -1,0 +1,81 @@
+#+TITLE: Javascript Composition Over Inheritance
+#+DATE: [2016-10-25 Tue 15:00]  
+#+TAGS: javascript
+#+LAYOUT: post
+#+CATEGORIES: javascript
+#+OPTIONS: toc:nil \n:t ^:{}
+
+Javascript中Composition示範code
+當在javascript中需要多重繼承概念時可考慮使用Composition
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* Factory functions
+
+OO形式：
+#+BEGIN_SRC js
+class Dog {
+  constructor() {
+    this.sound = 'woof'
+  }
+  talk() {
+    console.log(this.sound)
+  }
+}
+const sniffles = new Dog()
+sniffles.talk() // Outputs: "woof"
+#+END_SRC
+
+以Factory改寫：
+#+BEGIN_SRC js
+const dog = () => {
+  const sound = 'woof'
+  return {
+    talk: () => console.log(sound)
+  }
+}
+const sniffles = dog()
+sniffles.talk() // Outputs: "woof"
+#+END_SRC
+
+
+* Composition
+假設我們想建立以下物件關係
+#+BEGIN_SRC shell
+dog            = pooper + barker //dog can poop and bark
+cat            = pooper + meower //cat can poop and meow
+cleaningRobot  = driver + cleaner //cleaningRobot can be driven and clean
+murderRobot    = driver + killer
+murderRobotDog = driver + killer + barker
+#+END_SRC
+以上需求可使用多重繼承達成，但在javascript中我們也可用Composition來處理，以下範例使用到上述的Factory
+
+#+BEGIN_SRC js
+const barker = (state) => ({
+  bark: () => console.log('Woof, I am ' + state.name)
+})
+const driver = (state) => ({
+  drive: () => state.position = state.position + state.speed
+})
+#+END_SRC
+#+BEGIN_SRC js
+const murderRobotDog = (name)  => {
+  let state = {
+    name,
+    speed: 100,
+    position: 0
+  }
+  return Object.assign(
+        {},
+        barker(state),
+        driver(state),
+        killer(state)
+    )
+}
+const bruno =  murderRobotDog('bruno')
+bruno.bark() // "Woof, I am Bruno"
+#+END_SRC
+
+可以注意到的是，Composition比起多重繼承有更大的彈性，繼承需要在一開始就設計好整個繼承架構，而Composition則是可以在任何時候疊加上去即可
+在JS中可以多多利用Composition
