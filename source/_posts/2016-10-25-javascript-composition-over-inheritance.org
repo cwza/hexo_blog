@@ -13,7 +13,9 @@ Javascript中Composition示範code
 
 * Factory functions
 
-OO形式：
+Compare to prototype factory function is a more flexible way to create object using JS.
+  
+OO形式（using prototype）：
 #+BEGIN_SRC js
 class Dog {
   constructor() {
@@ -49,7 +51,7 @@ cleaningRobot  = driver + cleaner //cleaningRobot can be driven and clean
 murderRobot    = driver + killer
 murderRobotDog = driver + killer + barker
 #+END_SRC
-以上需求可使用多重繼承達成，但在javascript中我們也可用Composition來處理，以下範例使用到上述的Factory
+以上需求可使用prototype多重繼承達成，但在javascript中我們也可用Composition來處理，以下範例使用到上述的Factory
 
 #+BEGIN_SRC js
 const barker = (state) => ({
