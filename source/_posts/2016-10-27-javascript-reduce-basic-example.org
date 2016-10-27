@@ -1,0 +1,70 @@
+#+TITLE: javascript reduce basic example
+#+DATE: <2016-10-27 Thu 17:11>
+#+TAGS: javascript
+#+LAYOUT: post
+#+CATEGORIES: javascript
+#+OPTIONS: toc:t \n:t ^:{}
+ 
+Reduce is a function to transform an array to another something
+ 
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+ 
+* Basic Example
+input: votes
+output: { angular: 3, react: 4, ember: 1, vanilla: 1 }
+
+#+begin_src js
+let votes = [
+    "angular",
+    "angular",
+    "react",
+    "react",
+    "react",
+    "angular",
+    "ember",
+    "react",
+    "vanilla"
+];
+
+let initialVaue = {};
+
+let reducer = function(tally, vote) {
+    if(!tally[vote]) {
+        tally[vote] = 1;
+    } else {
+        tally[vote] = tally[vote] + 1;
+    }
+    return tally;
+};
+
+let result = votes.reduce(reducer, initialValue);
+
+console.log(result);
+#+end_src
+* map and filter is also a reduce
+#+begin_src js
+// contents of doubled === doubleMapped
+var data = [1, 2, 3];
+var doubled = data.reduce(function(acc, value) {
+    acc.push(value * 2);
+    return acc;
+}, []);
+var doubleMapped = data.map(function(item) {
+    return item * 2;
+});
+
+// contentes of evens === evenFiltered
+var data2 = [1, 2, 3, 4, 5];
+var evens = data2.reduce(function(acc, value) {
+    if(value % 2 ===0) {
+        acc.push(value);
+    }
+    return acc;
+}, []);
+var evenFiltered = data2.filter(function(item) {
+    return (item % 2 ===0);
+});
+#+end_src
+
