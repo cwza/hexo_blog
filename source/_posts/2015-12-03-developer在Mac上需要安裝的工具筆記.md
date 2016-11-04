@@ -56,10 +56,6 @@ brew install direnv
 API Documents Browser
 https://kapeli.com/dash
 
-### vagrant
-command line manage tool for VM
-https://www.vagrantup.com
-
 -------------------------------------------------------------------------------
 
 ## IOS、OSX APP開發相關
