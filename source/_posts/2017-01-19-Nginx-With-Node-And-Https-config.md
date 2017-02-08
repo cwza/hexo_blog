@@ -1,6 +1,6 @@
 title: Nginx With Node And Https config
-categories: javascript
-tags: [javascript, nodejs, https, ssl]
+categories: web
+tags: [javascript, nodejs, https, ssl, web]
 date: 2017-01-19 14:48:57
 ---
 Nginx With Node And Https config example
