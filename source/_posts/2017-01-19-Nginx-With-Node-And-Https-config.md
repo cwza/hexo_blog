@@ -24,6 +24,8 @@ upstream app_faceblock {
     keepalive 8;
 }
 
+limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s; # rate limit
+
 # the nginx server instance
 server {
     listen 0.0.0.0:80;
@@ -37,12 +39,15 @@ server {
     ssl_certificate_key /etc/nginx/ssl/nginx.key;
 
     location /static {
+      limit_req zone=one burst=5 nodelay;
       root /static;
     }
 
     # pass the request to the node.js server with the correct headers
     # and much more can be added, see nginx config options
     location / {
+      limit_req zone=one burst=5 nodelay;
+      
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
       proxy_set_header Host $http_host;
