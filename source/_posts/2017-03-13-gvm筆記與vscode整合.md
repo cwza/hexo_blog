@@ -1,8 +1,10 @@
 title: gvm筆記與vscode整合
 categories: golang
-tags: [golang]
+tags: [golang, gvm]
 date: 2017-03-13 18:11:57
 ---
+
+https://github.com/moovweb/gvm
 
 ## 安裝
 ``` bash
