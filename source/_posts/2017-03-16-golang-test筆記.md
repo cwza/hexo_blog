@@ -30,7 +30,7 @@ go test set pwd as package directory
 use relative path "test-fixtures" directory as a place to store test data(loading config, model data, binary data ...etc)  
 ``` go
 func TestAdd(t *testing.T) {
-  data := filepath.Join("test-fixtures", "daa_data.json")
+  data := filepath.Join("test-fixtures", "add_data.json")
   // Do something with data
 }
 ```
@@ -43,15 +43,19 @@ Very useful to test complex structures
 var update = flag.Bool("update", false, "update golden files")
 
 func TestAdd(t *testing.T) {
-  actual := doSomething(tc)
-  golden := filepath.Join("test-fixtures", tc.Name+".golden")
-  if *update {
-    ioUtil.WriteFile(golden, actual, 0644)
-  }
+  // ... table (probably!)
 
-  expected, _ := ioutil.ReadFile(golden)
-  if !bytes.Equal(actual, expected) {
-    //FAIL!
+  for _, tc := range tcs {
+    actual := doSomething(tc)
+    golden := filepath.Join("test-fixtures", tc.Name+".golden")
+    if *update {
+      ioUtil.WriteFile(golden, actual, 0644)
+    }
+
+    expected, _ := ioutil.ReadFile(golden)
+    if !bytes.Equal(actual, expected) {
+      //FAIL!
+    }
   }
 }
 ```
@@ -77,6 +81,8 @@ Test helper接受testing.T參數, helper中的錯誤直接在helper中處理掉
 helper return a function to clean
 ``` go
 func testTempFile(t * testing.T) (string, func()) {
+  t.Helper()
+
   tf, err := iotuil.TempFile("", "test")
   if err != nil {
     t.Fatalf("err: %s", err)
@@ -98,6 +104,8 @@ func TestThing(t *testing T) {
 然後在TestThing結束前呼叫os.chdir(old)
 ``` go
 func testChdir(t *testing.T, dir string) func() {
+  t.Helper()
+
   old, err := os.Getwd()
   if err != nil {
     t.Fatalf("err: %s", err)
@@ -118,6 +126,8 @@ func TestThing(t *testing.T) {
 不需要mock net.Conn
 ``` go
 func TestConn(t *testing.T) (client, server net.Conn) {
+  t.Helper()
+
   ln, err := net.Listen("tcp", "127.0.0.1:0")
 
   var server net.Conn
@@ -149,6 +159,45 @@ func TestGitGetter(t *testing.T) {
   }
 }
 ```
+Mock Subprocess
+``` go
+func helperProcess(s ...string) *exec.Cmd {
+  cs := []string{"-test.run=TestHelperProcess", "--"}
+  cs = append(cs, s...)
+  env := []string{
+    "GO_WANT_HELPER_PROCESS=1"
+  }
+
+  cmd := exec.Command(os.Args[0], cs...)
+  cmd.Env = append(env, os.Environ()...)
+  return cmd
+}
+
+func TestHelperProcess(*testing.T) {
+  if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+    return
+  }
+  defer os.Exit(0)
+
+  args := os.Args
+  for len(args) > 0 {
+    if args[0] == "--" {
+      args = args[1:]
+      break
+    }
+
+    args = args[1:]
+  }
+
+  ...
+
+  cmd, args := args[0], args[1:]
+  switch cmd {
+    case "foo":
+      // ...
+  }
+}
+```
 
 ## Testing as a public API
 提供使用你的package的user一個測試你的package的public API(Maybe a mock or a helper)
@@ -171,6 +220,25 @@ func TestThing(t * testing.T) {
   case <- thingHappened:
   case <- time.After(timeout):
     t.Fatal("timeout")
+  }
+}
+```
+
+## Complex Structs Compare(maybe graph)
+How to compare complex structs in test:
+``` go
+type ComplexThing struct {/* ... */}
+
+func (c *ComplexThing) testString() string {
+  // produce human-friendly output for test comparison
+}
+
+//----------------------------------------
+
+func TestComplexThing(t *testing.T) {
+  c1, c2 := createComplexThings()
+  if c1.testString() != c2.testString() {
+    t.Fatalf("no match:\n\n%s\n\n%s", c1.testString(), c2.testString())
   }
 }
 ```
