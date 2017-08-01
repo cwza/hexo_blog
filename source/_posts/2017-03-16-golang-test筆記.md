@@ -7,17 +7,20 @@ date: 2017-03-16 18:00:57
 # Table Driven Test
 ``` go
 func TestAdd(t * testing.T) {
-  case := map[string]struct{ A, B, Expected int} {
-    "foo": {1, 1, 2},
-    "bar": {1, -1, 0},
+  tcs := []struct{ 
+    Name string 
+    A, B, Expected int
+  }{
+    {"foo", 1, 1, 2},
+    {"bar", 1, -1, 0},
   }
-  for k, tc := range cases {
-    actual := tc.A + tc.B
-    if actual != expected {
-      t.Errorf(
-        "%s %d + %d = %d, exected %d",
-        k, tc.A, tc.B, actual, tc.Expected)
-    }
+  for _, tc := range tcs {
+    t.Run(tc.Name, func(t *testing.T) {
+      actual := tc.A + tc.B
+      if actual != expected {
+        t.Errorf("%d + %d = %d, exected %d", tc.A, tc.B, actual, tc.Expected)
+      }
+    })
   }
 }
 ```
